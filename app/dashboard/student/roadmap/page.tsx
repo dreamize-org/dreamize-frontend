@@ -12,10 +12,6 @@ export default function StudentRoadmapPage() {
   const { studentRoadmaps, isLoading: roadmapsLoading, refreshRoadmaps } = useRoadmaps();
   const { navigate } = useNavigationWithLoading();
 
-  const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
-  const [showProjectModal, setShowProjectModal] = useState(false);
-
-  const [completingMilestone, setCompletingMilestone] = useState(false);
   const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
 
@@ -123,8 +119,7 @@ export default function StudentRoadmapPage() {
 
 
   const handleCompleteMilestone = async (milestone: Milestone, _index: number) => {
-    setSelectedMilestone(milestone);
-    setShowProjectModal(true);
+    navigate(`/dashboard/student/projects/create/${selectedRoadmap?.id}`);
   };
 
 

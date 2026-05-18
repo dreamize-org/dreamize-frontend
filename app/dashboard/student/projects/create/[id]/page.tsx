@@ -5,13 +5,13 @@ import { useRoadmaps } from "@/contexts";
 import { roadmapService } from "@/services/roadmap";
 import { Milestone, Roadmap, UserRole } from "@/types";
 import { Briefcase, CheckCircle, Code, ExternalLink, Figma, FilePlus, FileText, Github, ImageIcon, Layers, Link2, Plus, Target, Trash2, X, Youtube } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
 
 export default function CreateProjectPage() {
     const { roadmaps, refreshRoadmaps } = useRoadmaps()
-    const { } = usePathname()
+    const { id } = useParams() as { id: string }
     const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
     const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
     const [loading, setLoading] = useState(false);
@@ -35,7 +35,12 @@ export default function CreateProjectPage() {
             pdfs: [] as string[]
         }
     });
-
+    useEffect(() => {
+        if (roadmaps.length > 0) {
+            const roadmap = roadmaps.find(r => r.id === id) || null;
+            setSelectedRoadmap(roadmap);
+        }
+    }, [id])
     const handleProjectSubmit = async () => {
 
         if (!selectedMilestone || !projectSubmission.description.trim() || !selectedRoadmap) {
@@ -80,7 +85,7 @@ export default function CreateProjectPage() {
     return (
         <div className="fixed bg-black/60 backdrop-blur-sm overflow-y-auto h-full w-full flex justify-center items-start">
             <Sidebar userType={UserRole.STUDENT} />
-            <div className="relative bg-white shadow-2xl max-w-full w-full max-h-[100vh] overflow-y-auto">
+            <div className="relative bg-white max-w-full w-full max-h-[100vh] overflow-y-auto">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-6">
 
