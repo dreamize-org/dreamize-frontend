@@ -111,7 +111,7 @@ export default function StudentProjectsPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         <main className="flex-1 overflow-auto">
-          <div className="p-8">
+          <div className="p-4 pl-16 md:p-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
