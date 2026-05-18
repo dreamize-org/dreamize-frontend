@@ -7,7 +7,7 @@ import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { Users, DollarSign, UserCheck, Tag, BarChart3, ArrowRight, Settings, ShieldCheck, Activity, Globe, Zap, Clock } from 'lucide-react';
 import { UserRole } from '@/types/user';
 
-export default function UmbrellaAdminDashboard() {
+export default function AdminDashboard() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { students, trainers, isLoading: usersLoading } = useUsers();
   const { getTotalBalance, isLoading: financialLoading } = useFinancial();
@@ -230,7 +230,7 @@ export default function UmbrellaAdminDashboard() {
             </div>
 
             <div className="mt-16 text-center">
-               <p className="text-slate-400 text-[12px] font-bold tracking-[0.4em] uppercase italic">Umbrella Academy Administrative OS v4.0.0-gold</p>
+               <p className="text-slate-400 text-[12px] font-bold tracking-[0.4em] uppercase italic">Dreamize</p>
             </div>
           </div>
         </main>

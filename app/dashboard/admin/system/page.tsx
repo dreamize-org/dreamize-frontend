@@ -45,7 +45,7 @@ function isISOString(value: string): boolean {
   return /^\d{4}-\d{2}-\d{2}T/.test(value);
 }
 
-export default function UmbrellaAdminSystemPage() {
+export default function AdminSystemPage() {
   const { metrics, alerts, services, isLoading, error, refreshSystemData } = useSystem();
 
   return (

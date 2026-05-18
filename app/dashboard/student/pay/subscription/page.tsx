@@ -283,7 +283,7 @@ export default function SubscriptionPaymentPage() {
                       <p className="text-slate-500 mb-6">Your mentorship subscription is now active</p>
                       <div className="bg-green-50 border border-green-200 rounded-xl p-4 max-w-md mx-auto mb-6">
                         <p className="text-sm text-green-700 mb-2">
-                          Welcome to Umbrella Academy! Your mentorship journey begins now.
+                          Welcome to Dreamize! Your mentorship journey begins now.
                         </p>
                         <p className="text-sm text-green-600">
                           Next billing date: {new Date(Date.now() + (billingCycle === 'monthly' ? 30 : 365) * 24 * 60 * 60 * 1000).toLocaleDateString()}

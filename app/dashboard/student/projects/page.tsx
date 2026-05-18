@@ -111,7 +111,7 @@ export default function StudentProjectsPage() {
 
       <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         <main className="flex-1 overflow-auto">
-          <div className="p-8">
+          <div className="p-4 pl-16 md:p-8">
             {/* Header */}
             <div className="mb-8">
               <div className="flex items-center justify-between">
@@ -120,7 +120,7 @@ export default function StudentProjectsPage() {
                   <p className="text-slate-500 font-light mt-1">View and manage all your submitted projects</p>
                 </div>
                 <button
-                  onClick={() => router.push('/dashboard/student/projects/create')}
+                  onClick={() => router.push('/dashboard/student/roadmap/create')}
                   className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-full font-medium hover:bg-slate-800 transition-colors"
                 >
                   <Plus className="w-4 h-4" />

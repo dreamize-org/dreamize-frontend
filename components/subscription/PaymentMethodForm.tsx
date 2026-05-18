@@ -121,7 +121,7 @@ export default function PaymentMethodForm({ formData, onInputChange }: PaymentMe
               value={formData.email}
               onChange={(e) => onInputChange('email', e.target.value)}
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-600 focus:border-transparent text-gray-900 placeholder:text-gray-400 pr-12"
-              placeholder="billing@umbrellaacademy.com"
+              placeholder="billing@dreamize.com"
             />
             <button
               type="button"

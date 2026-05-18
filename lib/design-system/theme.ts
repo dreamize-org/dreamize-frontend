@@ -1,12 +1,3 @@
-/**
- * Theme System for Umbrella Academy
- * 
- * This module defines the complete theme system with light/dark mode support,
- * CSS variables, and theme configuration management.
- * 
- * Validates: Requirements 9.1, 9.3
- */
-
 // Color scale interface for consistent color definitions
 export interface ColorScale {
   50: string;

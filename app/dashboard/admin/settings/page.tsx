@@ -6,7 +6,7 @@ import { Shield, Globe, Clock, Wallet, Save, RotateCcw, ShieldCheck, Database, Z
 import { UserRole } from '@/types';
 import { PremiumInput } from '@/components/ui/premium-input';
 
-export default function UmbrellaAdminSettingsPage() {
+export default function AdminSettingsPage() {
     const [systemSettings, setSystemSettings] = useState({
         platformName: 'Dreamize',
         defaultCurrency: 'RWF',

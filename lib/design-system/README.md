@@ -1,6 +1,6 @@
-# Umbrella Academy Design System - Spacing
+# Dreamize Design System - Spacing
 
-This directory contains the standardized spacing system for the Umbrella Academy application, ensuring consistent visual rhythm and maintainable styles across all components.
+This directory contains the standardized spacing system for the Dreamize application, ensuring consistent visual rhythm and maintainable styles across all components.
 
 ## Overview
 

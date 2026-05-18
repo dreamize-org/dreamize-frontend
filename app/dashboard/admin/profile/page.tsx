@@ -8,7 +8,7 @@ import { UserRole } from '@/types';
 import { BASE_URL, userService } from '@/services';
 import Image from 'next/image';
 
-export default function UmbrellaAdminProfilePage() {
+export default function AdminProfilePage() {
     const { user, updateUserProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);

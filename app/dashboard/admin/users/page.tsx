@@ -57,7 +57,7 @@ const getAvatarColor = (role: UserRole) => {
   }
 };
 
-export default function UmbrellaAdminUsersPage() {
+export default function AdminUsersPage() {
   const [selectedTab, setSelectedTab] = useState<'students' | 'trainers' | 'guardians' | 'admins' | 'sales_managers'>('students');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
