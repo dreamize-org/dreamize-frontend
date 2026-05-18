@@ -30,7 +30,7 @@ function ChatPageContent() {
 
 export default function StudentChatPage() {
     return (
-        <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+        <div className="flex h-screen overflow-hidden bg-[#FDF9F2]">
             <Sidebar activeItem="Chat" userType={UserRole.STUDENT} />
 
             <div className="flex-1 flex flex-col min-w-0">

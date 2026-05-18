@@ -49,8 +49,8 @@ export default function ResetPasswordPage() {
     const resetToken = localStorage.getItem('resetToken') || '';
 
     try {
-      await authService.resetPassword(resetToken, password);
-      localStorage.removeItem('resetEmail');
+      await authService.resetPassword( password);
+      localStorage.removeItem('userEmail');
       localStorage.removeItem('authFlow');
       localStorage.removeItem('resetToken');
       router.push('/auth/login');
