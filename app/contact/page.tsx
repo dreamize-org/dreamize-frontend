@@ -4,8 +4,10 @@ import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
 import { Mail, Phone, MapPin, Send, Book, Clock, Compass, Star, Sun } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useRouter } from '@/hooks/useRouter';
 
 export default function ContactPage() {
+  const router=useRouter()
   return (
     <>
       <Navbar />
@@ -137,13 +139,12 @@ export default function ContactPage() {
             <div className="mt-16 pt-8 border-t border-slate-200/60">
               <h3 className="font-semibold text-slate-800 uppercase tracking-widest text-[13px] mb-6">Quick Links</h3>
               <div className="flex flex-wrap gap-3">
-                <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[14px] font-medium text-slate-700 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
+                <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[14px] font-medium text-slate-700 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer"
+                onClick={()=>router.push("/auth/student/register")}>
                   Enroll Student
                 </div>
-                <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[14px] font-medium text-slate-700 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
-                  School Partnerships
-                </div>
-                <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[14px] font-medium text-slate-700 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
+                <div className="px-5 py-2.5 bg-white border border-slate-200 rounded-full text-[14px] font-medium text-slate-700 shadow-sm hover:shadow-md hover:border-primary/50 transition-all cursor-pointer"
+                onClick={()=>router.push('/auth/trainer/register')}>
                   Become a Mentor
                 </div>
               </div>
