@@ -119,7 +119,7 @@ export default function StudentRoadmapPage() {
 
 
   const handleCompleteMilestone = async (milestone: Milestone, _index: number) => {
-    navigate(`/dashboard/student/projects/create/${selectedRoadmap?.id}`);
+    navigate(`/dashboard/student/roadmap/create?roadmapId=${selectedRoadmap?.id}&milestoneOrder=${milestone.order}`);
   };
 
 
