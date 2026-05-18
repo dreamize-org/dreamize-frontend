@@ -112,7 +112,7 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
         </button>
 
         <div className="p-6 lg:p-8 border-b border-[#cda429]/10 cursor-pointer relative"
-          onClick={() => navigate(`/dashboard/${currentUserType}`)}>
+          onClick={() => navigate(`/`)}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(205,164,41,0.03)_0%,transparent_70%)] pointer-events-none" />
           <Logo size="md" />
         </div>
