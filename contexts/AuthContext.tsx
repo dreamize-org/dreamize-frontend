@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (response.success && response.data) {
               const trainerData = response.data
               localStorage.setItem('user', JSON.stringify(trainerData));
-              if(trainerData.approvalStatus === 'approved') {
+              if (trainerData.approvalStatus === 'approved') {
                 setUser(trainerData);
                 setIsLoading(false);
                 router.push('/dashboard/trainer');
@@ -236,6 +236,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
         return;
       }
+      // Check if this is a password reset flow
+      const authFlow = typeof window !== 'undefined' ? localStorage.getItem('authFlow') : null;
+      if (authFlow === 'reset-password') {
+        if (response.data) {
+          localStorage.setItem('auth_token', response.data.token);
+        }
+        router.push('/auth/reset-password');
+        return;
+      }
       if (response.data) {
         localStorage.setItem('auth_token', response.data.token);
         localStorage.setItem('user', JSON.stringify(response.data.user));
@@ -244,14 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           router.push('/auth/pending-approval');
           return;
         }
-      }
 
-      // Check if this is a password reset flow
-      const authFlow = typeof window !== 'undefined' ? localStorage.getItem('authFlow') : null;
-      if (authFlow === 'reset-password') {
-        router.push('/auth/reset-password');
-      } else {
-        router.push('/auth/login');
       }
     }
     catch {

@@ -34,7 +34,7 @@ export default function ForgotPasswordPage() {
     try {
       await authService.forgotPassword(email);
       // Store email and flow type for the OTP + reset flow
-      localStorage.setItem('resetEmail', email);
+      localStorage.setItem('userEmail', email);
       localStorage.setItem('authFlow', 'reset-password');
       router.push('/auth/verify');
     } catch {
