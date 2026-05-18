@@ -4,8 +4,10 @@ import { Navbar } from '@/components/navbar';
 import { Footer } from '@/components/footer';
 import { ProgramsNav } from '@/components/programs-nav';
 import { PlayfulHero } from '@/components/playful-hero';
+import { useRouter } from '@/hooks/useRouter';
 
 export default function BuilderPage() {
+  const router = useRouter()
   return (
     <>
       <Navbar />
@@ -32,8 +34,8 @@ export default function BuilderPage() {
                 Turn curiosity into consistent building habits.
               </h2>
               <p className="text-[18px] text-slate-600 font-light leading-relaxed mb-8">
-                Students work on multi-month projects, practice versioning, and learn 
-                collaboration until building software feels normal and enjoyable. 
+                Students work on multi-month projects, practice versioning, and learn
+                collaboration until building software feels normal and enjoyable.
                 Learners treat complexity as solvable.
               </p>
 
@@ -72,7 +74,7 @@ export default function BuilderPage() {
                 Is this worth building?
               </h2>
               <p className="text-lg text-slate-600 mb-12">
-                Shift focus from technical capability to user value. Students learn to research, 
+                Shift focus from technical capability to user value. Students learn to research,
                 test assumptions, and design solutions that respond to real environments.
               </p>
             </div>
@@ -100,50 +102,51 @@ export default function BuilderPage() {
                   From projects to ventures.
                 </h2>
                 <p className="text-lg text-slate-600">
-                  As projects mature, students form small teams to learn product-market fit, 
+                  As projects mature, students form small teams to learn product-market fit,
                   basic business skills, and how to communicate impact to partners and funders.
                 </p>
               </div>
 
               <div className="grid sm:grid-cols-2 gap-6">
-                 {[
-                   { label: "Team Formation", desc: "Defining roles, responsibilities, and shared goals." },
-                   { label: "Early Traction", desc: "Local pilots, user metrics, and community endorsements." },
-                   { label: "Pitching & Growth", desc: "Simple financials and storytelling for seed support." },
-                   { label: "Evidence of Impact", desc: "Working product with measurable user growth." }
-                 ].map((item, i) => (
-                   <div key={i} className="flex gap-4">
-                     <div className="w-6 h-6 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center mt-1">
-                       <span className="text-[10px] font-bold text-primary">{i+1}</span>
-                     </div>
-                     <div>
-                       <p className="font-bold text-foreground">{item.label}</p>
-                       <p className="text-sm text-slate-500">{item.desc}</p>
-                     </div>
-                   </div>
-                 ))}
+                {[
+                  { label: "Team Formation", desc: "Defining roles, responsibilities, and shared goals." },
+                  { label: "Early Traction", desc: "Local pilots, user metrics, and community endorsements." },
+                  { label: "Pitching & Growth", desc: "Simple financials and storytelling for seed support." },
+                  { label: "Evidence of Impact", desc: "Working product with measurable user growth." }
+                ].map((item, i) => (
+                  <div key={i} className="flex gap-4">
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center mt-1">
+                      <span className="text-[10px] font-bold text-primary">{i + 1}</span>
+                    </div>
+                    <div>
+                      <p className="font-bold text-foreground">{item.label}</p>
+                      <p className="text-sm text-slate-500">{item.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 p-8 md:p-12 rounded-[40px] text-center">
-               <h3 className="text-2xl font-playfair font-bold mb-6 italic">Success looks like:</h3>
-               <div className="space-y-6">
-                 <div>
-                   <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Leadership</p>
-                   <p className="text-slate-700">Team stewardship, clarity of vision, and resilience.</p>
-                 </div>
-                 <div className="w-12 h-[1px] bg-slate-200 mx-auto" />
-                 <div>
-                   <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Funding Readiness</p>
-                   <p className="text-slate-700">Clear plan for scaling and measurable milestones.</p>
-                 </div>
-               </div>
+              <h3 className="text-2xl font-playfair font-bold mb-6 italic">Success looks like:</h3>
+              <div className="space-y-6">
+                <div>
+                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Leadership</p>
+                  <p className="text-slate-700">Team stewardship, clarity of vision, and resilience.</p>
+                </div>
+                <div className="w-12 h-[1px] bg-slate-200 mx-auto" />
+                <div>
+                  <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Funding Readiness</p>
+                  <p className="text-slate-700">Clear plan for scaling and measurable milestones.</p>
+                </div>
+              </div>
             </div>
           </div>
 
           <div className="text-center pt-12">
             <h2 className="text-[32px] md:text-[40px] font-playfair font-semibold text-foreground mb-6">Become a Funded CEO</h2>
-            <button className="px-10 py-4 bg-primary text-primary-foreground rounded-full font-bold text-lg hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/20 transition-all">
+            <button className="px-10 py-4 bg-primary text-primary-foreground rounded-full font-bold text-lg hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/20 transition-all"
+              onClick={() => router.push("/auth/student/register")}>
               Join the Startup Track
             </button>
           </div>
