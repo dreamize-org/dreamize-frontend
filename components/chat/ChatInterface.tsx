@@ -115,7 +115,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
     };
 
     return (
-        <div className="flex h-full bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/30 overflow-hidden min-h-[600px] relative">
+        <div className="flex h-full bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/30 overflow-hidden md:min-h-[600px] relative">
             {/* Sidebar - Contact List */}
             <div className={`w-full md:w-96 border-r border-slate-100/80 flex flex-col bg-[#FDF9F2]/20 ${activeContact ? 'hidden md:flex' : 'flex'}`}>
                 <div className="p-6 md:p-8 border-b border-slate-100 pl-16 md:pl-8 bg-[#FDF9F2]/40">

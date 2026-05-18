@@ -7,7 +7,7 @@ import { ShieldCheck } from 'lucide-react';
 
 export default function AdminChatPage() {
     return (
-        <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
+        <div className="flex h-screen overflow-hidden bg-[#F8FAFC]">
             <Sidebar activeItem="Chat" userType={UserRole.ADMIN} />
 
             <div className="flex-1 flex flex-col min-w-0 overflow-hidden">

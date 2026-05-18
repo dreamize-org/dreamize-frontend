@@ -138,7 +138,7 @@ export function Navbar() {
             </div>
           ))}
           <Link
-            href="/contact"
+            href="/auth/signup"
             className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-primary-foreground rounded-full font-medium hover:bg-primary/90 transition mt-4"
             onClick={() => setIsOpen(false)}
           >

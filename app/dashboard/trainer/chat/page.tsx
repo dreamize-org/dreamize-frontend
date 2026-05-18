@@ -6,7 +6,7 @@ import ChatInterface from '@/components/chat/ChatInterface';
 
 export default function TrainerChatPage() {
     return (
-        <div className="flex min-h-screen lg:h-screen bg-white">
+        <div className="flex h-screen overflow-hidden bg-white">
             <Sidebar activeItem="Chat" userType={UserRole.TRAINER} />
 
             <div className="flex-1 flex flex-col min-w-0">
