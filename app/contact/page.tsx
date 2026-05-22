@@ -103,8 +103,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 mb-1">Email Support</h3>
-                  <a href="mailto:info@dreamizeafrica.com" className="text-[17px] text-muted-foreground font-light hover:text-primary transition-colors">
-                    info@dreamizeafrica.com
+                  <a href="mailto:dreamizeafrica@gmail.com" className="text-[17px] text-muted-foreground font-light hover:text-primary transition-colors">
+                    dreamizeafrica@gmail.com
                   </a>
                 </div>
               </div>
@@ -115,8 +115,8 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800 mb-1">Call Us</h3>
-                  <a href="tel:+254123456789" className="text-[17px] text-muted-foreground font-light hover:text-primary transition-colors">
-                    +254 (0) 123 456 789
+                  <a href="tel:+250785837748" className="text-[17px] text-muted-foreground font-light hover:text-primary transition-colors">
+                    +250 785 837 748
                   </a>
                 </div>
               </div>
@@ -128,8 +128,7 @@ export default function ContactPage() {
                 <div>
                   <h3 className="font-bold text-slate-800 mb-1">Headquarters</h3>
                   <p className="text-[17px] text-muted-foreground font-light leading-relaxed max-w-[250px]">
-                    Innovation Hub,<br />
-                    Nairobi, Kenya
+                    Car-Free-Zone (Near Norrsken Kigali House) Rwanda
                   </p>
                 </div>
               </div>

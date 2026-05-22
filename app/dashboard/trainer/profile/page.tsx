@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { User, Mail, Shield, Bell, Calendar, MapPin, Edit2, Check, Phone, Globe, Briefcase, Award, ChevronRight, Settings, Star, Zap, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts';
-import { UserRole } from '@/types';
+import { Trainer, UserRole } from '@/types';
 import { BASE_URL, userService } from '@/services';
 import Image from 'next/image';
 
@@ -14,20 +14,52 @@ export default function TrainerProfilePage() {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const trainerUser = user as Trainer;
+
     const [profileData, setProfileData] = useState({
         name: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Demi Wilkinson',
         email: user?.email || 'd.wilkinson@dreamize.rw',
-        phone: '+250 788 111 222',
+        phone: user?.phoneNumber || '+250 788 111 222',
         location: 'Kigali, Rwanda',
         bio: 'Senior Software Engineer with 8+ years of experience in React, Node.js and Cloud Architecture. Passionate about mentoring the next generation of African developers.',
-        expertise: ['Full Stack Development', 'Cloud Architecture', 'React & Next.js', 'System Design'],
-        experience: '8+ Years',
-        field: 'Software Engineering',
+        expertise: trainerUser?.skills && trainerUser.skills.length > 0 ? trainerUser.skills : ['Full Stack Development', 'Cloud Architecture', 'React & Next.js', 'System Design'],
+        experience: trainerUser?.experience?.yearsOfExperience ? `${trainerUser.experience.yearsOfExperience}+ Years` : '8+ Years',
+        field: trainerUser?.experience?.specializations?.[0] || 'Software Engineering',
         joinDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Jan 2023'
     });
 
-    const handleSave = () => {
+    useEffect(() => {
+        if (user) {
+            const tUser = user as Trainer;
+            setProfileData({
+                name: `${user.firstName} ${user.lastName}`,
+                email: user.email,
+                phone: user.phoneNumber || '+250 788 111 222',
+                location: 'Kigali, Rwanda',
+                bio: 'Senior Software Engineer with 8+ years of experience in React, Node.js and Cloud Architecture. Passionate about mentoring the next generation of African developers.',
+                expertise: tUser.skills && tUser.skills.length > 0 ? tUser.skills : ['Full Stack Development', 'Cloud Architecture', 'React & Next.js', 'System Design'],
+                experience: tUser.experience?.yearsOfExperience ? `${tUser.experience.yearsOfExperience}+ Years` : '8+ Years',
+                field: tUser.experience?.specializations?.[0] || 'Software Engineering',
+                joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Jan 2023'
+            });
+        }
+    }, [user]);
+
+    const handleSave = async () => {
         setIsEditing(false);
+        try {
+            const nameParts = profileData.name.trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            await updateUserProfile({
+                firstName,
+                lastName,
+                email: profileData.email,
+                phoneNumber: profileData.phone,
+            });
+        } catch (error) {
+            console.error('Error saving profile:', error);
+        }
     };
 
     const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
