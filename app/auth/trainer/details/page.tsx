@@ -30,7 +30,6 @@ export default function TrainerDetailsPage() {
     specializations: '',
     skills: '',
   });
-  const [isLoading, setIsLoading] = useState(false);
 
   const expertiseOptions = [
     "Web Development", "Mobile Development", "Data Science", "Machine Learning",
@@ -62,7 +61,7 @@ export default function TrainerDetailsPage() {
     }));
   };
 
-  const { registerTrainer } = useAuth();
+  const { registerTrainer, isLoading } = useAuth();
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +89,6 @@ export default function TrainerDetailsPage() {
       return;
     }
 
-    setIsLoading(true);
     try {
       const baseData = {
         firstName: localStorage.getItem('userFirstName') || '',
@@ -128,18 +126,26 @@ export default function TrainerDetailsPage() {
       };
 
       await registerTrainer(trainerData);
-    
+
     } catch (error) {
       console.error('Registration failed:', error);
     } finally {
-      setIsLoading(false);
+      setErrors({
+        dateOfBirth: '',
+        gender: '',
+        cvUrl: '',
+        introVideoUrl: '',
+        yearsOfExperience: '',
+        specializations: '',
+        skills: '',
+      })
     }
   };
 
   return (
     <AuthContainer>
-      <AuthCard 
-        title="Professional Profile" 
+      <AuthCard
+        title="Professional Profile"
         subtitle="Showcase your expertise and join our network of world-class trainers."
       >
         <button
@@ -228,7 +234,7 @@ export default function TrainerDetailsPage() {
               <span className="w-6 h-6 bg-primary/10 text-primary rounded-lg flex items-center justify-center text-[12px]">3</span>
               Expertise & Skills
             </h3>
-            
+
             <PremiumInput
               label="Years of Experience"
               type="number"
@@ -289,8 +295,8 @@ export default function TrainerDetailsPage() {
           </div>
 
           <div className="pt-4">
-            <PremiumButton 
-              type="submit" 
+            <PremiumButton
+              type="submit"
               isLoading={isLoading}
             >
               {isLoading ? 'Submitting Application...' : 'Submit Application'}
@@ -315,19 +321,19 @@ export default function TrainerDetailsPage() {
 
 function ChevronDown(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg 
-      {...props} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <path d="m6 9 6 6 6-6"/>
+      <path d="m6 9 6 6 6-6" />
     </svg>
   );
 }

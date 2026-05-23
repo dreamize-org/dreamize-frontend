@@ -40,6 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkSession = async () => {
+      setIsLoading(true)
       const storedUser = localStorage.getItem('user');
       const token = localStorage.getItem('auth_token');
       const storedTrainer = localStorage.getItem('user');
@@ -115,7 +116,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleDashboardRedirect = () => {
+    setIsLoading(true)
     if (user) {
+      console.log(user)
       const dashboardRoutes: Record<string, string> = {
         'student': '/dashboard/student',
         'trainer': '/dashboard/trainer',
@@ -125,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
       router.push(dashboardRoutes[user.role]);
     }
+    setIsLoading(false)
   }
 
   const fetchOnboardingChecklist = async () => {
@@ -148,7 +152,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Separate effect to handle user changes (like login/logout)
   useEffect(() => {
+    setIsLoading(true)
     fetchOnboardingChecklist();
+    setIsLoading(false)
   }, [user?._id]);
 
 
@@ -230,6 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const verifyOtp = async (email: string, otpValue: string) => {
     try {
+      setIsLoading(true)
       const response = await authService.verifyOtp(email, otpValue);
       if (!response.success) {
         setError(response.message || 'Verification failed. Please try again.');
@@ -297,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const updateUserProfile = async (userData: Partial<BaseUser>) => {
     if (!user) return;
-
+    setIsLoading(true)
     try {
       const response = await userService.updateProfile(userData);
       if (response.success && response.data) {
@@ -308,6 +315,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error('Error updating user profile:', error);
       throw error;
+    } finally {
+      setIsLoading(false)
     }
   };
 
