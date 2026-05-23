@@ -12,9 +12,8 @@ export default function VerifyPage() {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(120);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const { verifyOtp } = useAuth()
+  const { verifyOtp,isLoading } = useAuth()
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -60,11 +59,9 @@ export default function VerifyPage() {
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
     const otpValue = otp.join('');
     if (otpValue.length !== 6) {
       setError('Please enter the complete 6-digit code');
-      setIsLoading(false);
       return;
     }
 
@@ -77,7 +74,7 @@ export default function VerifyPage() {
     } catch {
       setError('Invalid or expired code. Please try again.');
     } finally {
-      setIsLoading(false);
+      setError('')
     }
   };
 

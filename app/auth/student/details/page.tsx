@@ -26,10 +26,9 @@ export default function StudentDetailsPage() {
     guardianEmail: '',
     guardianPhoneNumber: ''
   });
-  const [isLoading, setIsLoading] = useState(false);
   const [showGuardianFields, setShowGuardianFields] = useState(false);
 
-  const { registerStudent } = useAuth();
+  const { registerStudent, isLoading } = useAuth();
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -80,7 +79,6 @@ export default function StudentDetailsPage() {
       return;
     }
 
-    setIsLoading(true);
     try {
       const baseData = {
         phoneNumber: localStorage.getItem('userPhoneNumber') || '',
@@ -117,7 +115,13 @@ export default function StudentDetailsPage() {
     } catch (error) {
       console.error('Registration failed:', error);
     } finally {
-      setIsLoading(false);
+      setErrors({
+        dateOfBirth: '',
+        gender: '',
+        guardianName: '',
+        guardianEmail: '',
+        guardianPhoneNumber: ''
+      })
     }
   };
 
