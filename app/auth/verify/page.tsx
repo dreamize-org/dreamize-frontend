@@ -11,9 +11,16 @@ import { useAuth } from '@/contexts';
 export default function VerifyPage() {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(120);
-  const [error, setError] = useState('');
+  const [email, setEmail] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const { verifyOtp,isLoading } = useAuth()
+  const { verifyOtp, isLoading, error, clearError, syncSessionUser } = useAuth();
+
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('userEmail') || '';
+    setEmail(storedEmail);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -22,16 +29,45 @@ export default function VerifyPage() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkExistingVerification = async () => {
+      const sessionUser = await syncSessionUser();
+      if (cancelled || !sessionUser?.isVerified) return;
+
+      if (sessionUser.role === 'trainer' && (sessionUser as { approvalStatus?: string }).approvalStatus === 'pending') {
+        window.location.href = '/auth/pending-approval';
+        return;
+      }
+
+      const dashboardRoutes: Record<string, string> = {
+        student: '/dashboard/student',
+        trainer: '/dashboard/trainer',
+        admin: '/dashboard/admin',
+        guardian: '/dashboard/guardian',
+        sales_manager: '/dashboard/sales',
+      };
+      window.location.href = dashboardRoutes[sessionUser.role] || '/dashboard/student';
+    };
+
+    checkExistingVerification();
+    return () => {
+      cancelled = true;
+    };
+  }, [syncSessionUser]);
+
   const handleChange = (index: number, value: string) => {
     if (value.length > 1) return;
     if (!/^\d*$/.test(value)) return;
 
-    setError('');
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
     const newOtp = [...otp];
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Move to next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -48,6 +84,9 @@ export default function VerifyPage() {
     const pastedData = e.clipboardData.getData('text').slice(0, 6);
     if (!/^\d+$/.test(pastedData)) return;
 
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
     const newOtp = [...otp];
     pastedData.split('').forEach((char, index) => {
       if (index < 6) newOtp[index] = char;
@@ -58,36 +97,47 @@ export default function VerifyPage() {
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
+
     const otpValue = otp.join('');
     if (otpValue.length !== 6) {
-      setError('Please enter the complete 6-digit code');
+      setFormError('Please enter the complete 6-digit code');
       return;
     }
 
-    const email = typeof window !== 'undefined'
-      ? (localStorage.getItem('userEmail') || '')
-      : '';
+    if (!email) {
+      setFormError('Email address is missing. Please register or sign in again.');
+      return;
+    }
 
-    try {
-      await verifyOtp(email, otpValue);
-    } catch {
-      setError('Invalid or expired code. Please try again.');
-    } finally {
-      setError('')
+    const success = await verifyOtp(email, otpValue);
+    if (!success) {
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     }
   };
 
   const handleResend = async () => {
-    const email = typeof window !== 'undefined'
-      ? (localStorage.getItem('userEmail') || '')
-      : '';
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
+
+    if (!email) {
+      setResendMessage('Email address is missing. Please register or sign in again.');
+      return;
+    }
+
     try {
       await authService.resendOtp(email);
+      setResendMessage('A new verification code was sent. Check your inbox and spam folder.');
+      setTimer(120);
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     } catch {
-      // Silently fail — timer still resets
+      setResendMessage('Could not resend the code. Please try again in a moment.');
     }
-    setTimer(120);
   };
 
   const formatTime = (seconds: number) => {
@@ -96,6 +146,8 @@ export default function VerifyPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const displayError = error || formError;
+
   return (
     <AuthContainer>
       <AuthCard
@@ -103,6 +155,7 @@ export default function VerifyPage() {
         subtitle="We've sent a 6-digit code to your inbox. Enter it below to proceed."
       >
         <button
+          type="button"
           onClick={() => window.history.back()}
           className="absolute top-5 left-5 sm:top-8 sm:left-8 p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-all group"
         >
@@ -114,9 +167,7 @@ export default function VerifyPage() {
             <ShieldCheck size={32} />
           </div>
           <p className="text-[14px] text-slate-400 font-medium tracking-tight">
-            ({typeof window !== 'undefined' ?
-              localStorage.getItem('userEmail') || 'johndoe@example.com'
-              : 'johndoe@example.com'})
+            ({email || 'your email'})
           </p>
         </div>
 
@@ -133,24 +184,37 @@ export default function VerifyPage() {
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
                 onPaste={handlePaste}
+                disabled={isLoading}
                 className={`
                   w-10 h-12 sm:w-11 sm:h-14 md:w-14 md:h-16 text-center text-lg sm:text-xl font-bold border rounded-xl 
                   focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary 
-                  transition-all bg-slate-50 text-slate-900
-                  ${error ? 'border-red-500 ring-red-500/10' : 'border-slate-200'}
+                  transition-all bg-slate-50 text-slate-900 disabled:opacity-60
+                  ${displayError ? 'border-red-500 ring-red-500/10' : 'border-slate-200'}
                 `}
               />
             ))}
           </div>
 
-          {error && (
-            <p className="text-[14px] text-red-500 text-center font-medium italic">
-              {error}
+          {displayError && (
+            <p className="text-[14px] text-red-500 text-center font-medium">
+              {displayError}
+            </p>
+          )}
+
+          {resendMessage && (
+            <p className={`text-[14px] text-center font-medium ${resendMessage.includes('Could not') ? 'text-red-500' : 'text-green-600'}`}>
+              {resendMessage}
+            </p>
+          )}
+
+          {!email && (
+            <p className="text-[14px] text-amber-600 text-center font-medium">
+              We could not find your email for verification. Please sign in or register again.
             </p>
           )}
 
           <div className="text-center">
-            <span className="text-[15px] text-slate-500 font-light">Didn't receive code? </span>
+            <span className="text-[15px] text-slate-500 font-light">Didn&apos;t receive code? </span>
             {timer > 0 ? (
               <span className="text-[15px] text-primary font-bold">
                 Resend in {formatTime(timer)}
@@ -159,7 +223,8 @@ export default function VerifyPage() {
               <button
                 type="button"
                 onClick={handleResend}
-                className="text-[15px] text-primary font-bold hover:underline"
+                disabled={isLoading}
+                className="text-[15px] text-primary font-bold hover:underline disabled:opacity-50"
               >
                 Resend Now
               </button>
@@ -169,6 +234,7 @@ export default function VerifyPage() {
           <PremiumButton
             type="submit"
             isLoading={isLoading}
+            disabled={!email || isLoading}
           >
             Verify & Continue
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -189,4 +255,3 @@ export default function VerifyPage() {
     </AuthContainer>
   );
 }
-

@@ -12,29 +12,13 @@ import { PremiumButton } from '@/components/ui/premium-button';
 export default function LoginPage() {
   const { navigate } = useNavigationWithLoading();
   const { login, isLoading, error } = useAuth();
-  const { isAuthenticated, user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [localErrors, setLocalErrors] = useState({ email: '', password: '' });
 
   useEffect(() => {
     setLocalErrors({ email: '', password: '' });
-  }, [])
-
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      console.log(user.role)
-      // Redirect based on user role
-      const dashboardRoutes: Record<string, string> = {
-        'student': '/dashboard/student',
-        'trainer': '/dashboard/trainer',
-        'admin': '/dashboard/admin',
-        'guardian': '/dashboard/guardian',
-        'sales_manager': '/dashboard/sales'
-      };
-      navigate(dashboardRoutes[user.role]);
-    }
-  }, [isAuthenticated, user, navigate]);
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

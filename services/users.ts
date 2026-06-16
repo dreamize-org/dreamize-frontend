@@ -8,6 +8,10 @@ class UserService {
     return apiClient.get<Student>(API_ENDPOINTS.USERS_ME);
   }
 
+  async getMe(): Promise<ApiResponse<BaseUser>> {
+    return apiClient.get<BaseUser>(API_ENDPOINTS.USERS_ME);
+  }
+
   async getTrainer(): Promise<ApiResponse<Trainer>> {
     return apiClient.get<Trainer>(API_ENDPOINTS.USERS_ME);
   }
