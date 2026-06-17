@@ -15,11 +15,16 @@ export interface AdminPayment {
 }
 
 export interface AdminAnalytics {
-  totalUsers: number;
-  totalTrainers: number;
-  totalStudents: number;
+  usersByRole: {
+    student: number;
+    trainer: number;
+  };
   totalRevenue: number;
+  monthlyRevenue: number;
+  activeRoadmaps: number;
   pendingTrainers: number;
+  activeSubscriptions: number;
+  totalCertificates: number;
 }
 
 export interface FeedbackTicket {
@@ -137,38 +142,12 @@ class AdminService {
 
   // Analytics
   async getAnalytics(): Promise<ApiResponse<AdminAnalytics>> {
-    // Calculate analytics from users data
-    const usersResponse = await this.getUsers();
-    const trainersResponse = await this.getTrainers();
-    const paymentsResponse = await this.getPayments();
+    return apiClient.get<AdminAnalytics>(API_ENDPOINTS.ADMIN_ANALYTICS);
+  }
 
-    if (!usersResponse.data || !trainersResponse.data || !paymentsResponse.data) {
-      return {
-        success: false,
-        data: {
-          totalUsers: 0,
-          totalTrainers: 0,
-          totalStudents: 0,
-          totalRevenue: 0,
-          pendingTrainers: 0
-        },
-        message: 'Failed to calculate analytics'
-      };
-    }
-
-    const analytics: AdminAnalytics = {
-      totalUsers: usersResponse.data.length,
-      totalTrainers: trainersResponse.data.length,
-      totalStudents: usersResponse.data.filter(u => u.role === 'student').length,
-      totalRevenue: paymentsResponse.data.reduce((sum, p) => p.status === 'completed' ? sum + p.amount : sum, 0),
-      pendingTrainers: trainersResponse.data.filter(t => t.approvalStatus === 'pending').length,
-    };
-
-    return {
-      success: true,
-      data: analytics,
-      message: 'Analytics retrieved successfully'
-    };
+  async getCertificates(search?: string): Promise<ApiResponse<import('./certificates').CertificateRecord[]>> {
+    const suffix = search ? `?search=${encodeURIComponent(search)}` : '';
+    return apiClient.get(`${API_ENDPOINTS.ADMIN_CERTIFICATES}${suffix}`);
   }
 
   // Feedback & Support
@@ -278,11 +257,13 @@ class AdminService {
           students: [],
           payments: [],
           analytics: {
-            totalUsers: 0,
-            totalTrainers: 0,
-            totalStudents: 0,
+            usersByRole: { student: 0, trainer: 0 },
             totalRevenue: 0,
-            pendingTrainers: 0
+            monthlyRevenue: 0,
+            activeRoadmaps: 0,
+            pendingTrainers: 0,
+            activeSubscriptions: 0,
+            totalCertificates: 0,
           },
           tickets: [],
           roadmaps: []

@@ -63,8 +63,11 @@ export const API_ENDPOINTS = {
   SYSTEM_DATABASE: '/api/system/database',
   SYSTEM_MEMORY: '/api/system/memory',
   TRAINERS_PENDING: '/api/trainers/pending',
+  TRAINER_MY_AVAILABILITY: '/api/trainers/me/availability',
+  TRAINER_SLOTS: (id: string) => `/api/trainers/${id}/slots`,
 
   ADMIN_ANALYTICS: '/api/admin/analytics',
+  ADMIN_CERTIFICATES: '/api/admin/certificates',
   ADMIN_FEEDBACK: '/api/admin/feedback',
   ADMIN_APPROVE_TRAINER: (id: string) => `/api/admin/trainers/${id}/approve`,
   ADMIN_REJECT_TRAINER: (id: string) => `/api/admin/trainers/${id}/reject`,
@@ -80,6 +83,10 @@ export const API_ENDPOINTS = {
   GUARDIAN_STUDENT_BY_ID: (id: string) => `/api/guardian/students/${id}`,
   GUARDIAN_STUDENT_CERTIFICATES: (id: string) => `/api/guardian/students/${id}/certificates`,
   GUARDIAN_STUDENT_PROJECTS: (id: string) => `/api/guardian/students/${id}/projects`,
+
+  SALES_DASHBOARD: '/api/sales/dashboard',
+  SALES_LEADS: '/api/sales/leads',
+  SALES_LEAD_BY_ID: (id: string) => `/api/sales/leads/${id}`,
   
   FILES: {
     UPLOAD_AVATAR: '/api/files/avatar',

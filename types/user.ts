@@ -89,6 +89,10 @@ export interface Trainer extends BaseUser {
 }
 
 
+export type ProfileUpdate = Partial<
+  BaseUser & Pick<Student, 'bio' | 'isPublicProfileEnabled'>
+>;
+
 export interface StudentRegister extends Partial<BaseUser> {
   ageRange?: AgeRange;
   guardianName?: string;

@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useUsers, useFinancial } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
-import { Users, DollarSign, UserCheck, Tag, BarChart3, ArrowRight, Settings, ShieldCheck, Activity, Globe, Zap, Clock } from 'lucide-react';
+import { Users, DollarSign, UserCheck, Tag, BarChart3, ArrowRight, Settings, ShieldCheck, Activity, Globe, Zap, Clock, Award } from 'lucide-react';
 import { UserRole } from '@/types/user';
 
 export default function AdminDashboard() {
@@ -72,6 +72,7 @@ export default function AdminDashboard() {
     { title: 'Promo Engine', desc: 'Manage discount campaigns', icon: Tag, href: '/dashboard/admin/promo-codes', color: 'bg-purple-600' },
     { title: 'Trainer Review', desc: 'Verify onboarding apps', icon: ShieldCheck, href: '/dashboard/admin/trainer-approvals', color: 'bg-orange-500' },
     { title: 'Analytics Center', desc: 'System-wide performance', icon: BarChart3, href: '/dashboard/admin/reports', color: 'bg-indigo-600' },
+    { title: 'Certificates', desc: 'Search issued certificates', icon: Award, href: '/dashboard/admin/certificates', color: 'bg-amber-500' },
     { title: 'System Config', desc: 'Environment variables & settings', icon: Settings, href: '/dashboard/admin/system', color: 'bg-slate-900' },
   ];
 

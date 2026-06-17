@@ -1,4 +1,4 @@
-import { Student, BaseUser, Trainer } from '@/types';
+import { Student, BaseUser, Trainer, ProfileUpdate } from '@/types';
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './constants';
 import { ApiResponse } from '@/types/api';
@@ -16,7 +16,7 @@ class UserService {
     return apiClient.get<Trainer>(API_ENDPOINTS.USERS_ME);
   }
 
-  async updateProfile(data: Partial<BaseUser>): Promise<ApiResponse<BaseUser>> {
+  async updateProfile(data: ProfileUpdate): Promise<ApiResponse<BaseUser>> {
     return apiClient.put<BaseUser>(API_ENDPOINTS.USER_PROFILE, data);
   }
 

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { BaseUser, Trainer, UserRole } from '@/types/user';
-import { adminService, AdminPayment, type FeedbackTicket } from '@/services/admin';
+import { adminService, AdminPayment, type FeedbackTicket, type AdminAnalytics } from '@/services/admin';
 import { useAdmin, CreateUserData, UserStatus } from '@/hooks/useAdmin';
 import { useAuth } from './AuthContext';
 
@@ -24,13 +24,7 @@ interface AdminContextType {
   paymentsError: string | null;
   refreshPayments: () => Promise<void>;
   // Analytics
-  analytics: {
-    totalUsers: number;
-    totalTrainers: number;
-    totalStudents: number;
-    totalRevenue: number;
-    pendingTrainers: number;
-  } | null;
+  analytics: AdminAnalytics | null;
   analyticsLoading: boolean;
   analyticsError: string | null;
   refreshAnalytics: () => Promise<void>;
@@ -54,13 +48,7 @@ interface AdminContextType {
   filterPaymentsByField: (payments: AdminPayment[], fieldId: string) => AdminPayment[];
   updateTicketStatus: (id: string, status: 'open' | 'in_progress' | 'resolved' | 'closed') => Promise<void>;
   addAdminResponse: (id: string, response: string) => Promise<void>;
-  getAnalytics: () => Promise<{
-    totalUsers: number;
-    totalTrainers: number;
-    totalStudents: number;
-    totalRevenue: number;
-    pendingTrainers: number;
-  } | null>;
+  getAnalytics: () => Promise<AdminAnalytics | null>;
 }
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
@@ -83,13 +71,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsError, setPaymentsError] = useState<string | null>(null);
   
-  const [analytics, setAnalytics] = useState<{
-    totalUsers: number;
-    totalTrainers: number;
-    totalStudents: number;
-    totalRevenue: number;
-    pendingTrainers: number;
-  } | null>(null);
+  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   

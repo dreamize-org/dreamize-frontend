@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Calendar, Clock, User, CheckCircle, MessageSquare, AlertCircle } from 'lucide-react';
 import { useUsers } from '@/contexts';
 import { Trainer, StudentBookingRequest } from '@/types';
 import { useCreateBooking } from '@/hooks/useBooking';
+import { availabilityService, type AvailabilitySlot } from '@/services';
 
 interface BookingCalendarProps {
   onClose: () => void;
@@ -16,15 +17,35 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
   const { createBooking, isLoading, error } = useCreateBooking();
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
   const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [learningGoals, setLearningGoals] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [bookingStep, setBookingStep] = useState<'select' | 'confirm' | 'submitting' | 'success'>('select');
 
+  useEffect(() => {
+    if (!selectedTrainer || !selectedDate) {
+      setAvailableSlots([]);
+      setSelectedSlot(null);
+      return;
+    }
+
+    setSlotsLoading(true);
+    setSelectedSlot(null);
+    availabilityService
+      .getTrainerSlots(selectedTrainer._id, selectedDate)
+      .then((response) => {
+        setAvailableSlots(response.success && response.data ? response.data : []);
+      })
+      .catch(() => setAvailableSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [selectedTrainer, selectedDate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedTrainer || !selectedDate || !selectedTime || !learningGoals.trim()) {
+    if (!selectedTrainer || !selectedSlot || !learningGoals.trim()) {
       setSubmitError('Please fill in all fields');
       return;
     }
@@ -34,7 +55,7 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
 
     const bookingRequest: StudentBookingRequest = {
       trainerId: selectedTrainer._id,
-      requestedTime: new Date(`${selectedDate}T${selectedTime}`),
+      requestedTime: new Date(selectedSlot.isoTime),
       learningGoals: learningGoals.trim(),
     };
 
@@ -56,8 +77,9 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
     }
   };
 
-  const canProceed = selectedTrainer && selectedDate && selectedTime && learningGoals.trim();
+  const canProceed = selectedTrainer && selectedDate && selectedSlot && learningGoals.trim();
   const displayError = submitError || error;
+  const selectedTime = selectedSlot?.startTime || '';
 
   if (bookingStep === 'submitting') {
     return (
@@ -206,17 +228,35 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
 
               {selectedTrainer && selectedDate && (
                 <div>
-                  <h3 className="font-medium text-slate-900 mb-3">Select Time</h3>
-                  <input
-                    type="time"
-                    value={selectedTime}
-                    onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none"
-                  />
+                  <h3 className="font-medium text-slate-900 mb-3">Select Time Slot</h3>
+                  {slotsLoading ? (
+                    <p className="text-sm text-slate-500">Loading available slots...</p>
+                  ) : availableSlots.length === 0 ? (
+                    <p className="text-sm text-slate-500 rounded-2xl bg-slate-50 border border-slate-100 px-4 py-3">
+                      No open slots on this date. Pick another day or ask your mentor to update availability.
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {availableSlots.map((slot) => (
+                        <button
+                          key={slot.isoTime}
+                          type="button"
+                          onClick={() => setSelectedSlot(slot)}
+                          className={`px-4 py-3 rounded-2xl border text-sm font-medium transition-colors ${
+                            selectedSlot?.isoTime === slot.isoTime
+                              ? 'border-primary bg-primary/5 text-primary'
+                              : 'border-slate-100 hover:border-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {slot.startTime}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
-              {selectedTrainer && selectedDate && selectedTime && (
+              {selectedTrainer && selectedDate && selectedSlot && (
                 <div>
                   <h3 className="font-medium text-slate-900 mb-3">Your Learning Goals</h3>
                   <textarea

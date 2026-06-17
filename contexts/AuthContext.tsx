@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authService } from '@/services/auth';
 import { apiClient } from '@/services/client';
-import { BaseUser, OnboardingChecklist, StudentRegister, Trainer, UserRole, Guardian, GuardianInviteState } from '@/types';
+import { BaseUser, OnboardingChecklist, StudentRegister, Trainer, UserRole, Guardian, GuardianInviteState, ProfileUpdate } from '@/types';
 import { useRouter } from '@/hooks/useRouter';
 import { userService } from '@/services';
 import {
@@ -30,7 +30,7 @@ interface AuthContextType {
   onboardingChecklist: OnboardingChecklist;
   handleDashboardRedirect: () => void;
   fetchOnboardingChecklist: () => Promise<void>;
-  updateUserProfile: (userData: Partial<BaseUser>) => Promise<void>;
+  updateUserProfile: (userData: ProfileUpdate) => Promise<void>;
   verifyOtp: (email: string, otpValue: string) => Promise<boolean>;
   resendVerificationOtp: (email: string) => Promise<{ success: boolean; message?: string }>;
   clearError: () => void;
@@ -391,7 +391,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const updateUserProfile = async (userData: Partial<BaseUser>) => {
+  const updateUserProfile = async (userData: ProfileUpdate) => {
     if (!user) return;
     setIsLoading(true);
     try {
