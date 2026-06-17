@@ -295,9 +295,9 @@ export default function StudentCalendarPage() {
                                   <p className="text-sm text-slate-700 font-light mb-2">{session.approvalNotes}</p>
                                   {session.sessionLocation && (
                                     <div className="mt-3 pt-3 border-t border-primary/20">
-                                      <p className="text-sm font-medium text-primary mb-1">
-                                        {session.sessionFormat === 'online' ? 'Meeting Link' : 'Location'}
-                                      </p>
+                                    <p className="text-sm font-medium text-primary mb-1">
+                                      {session.sessionFormat === 'online' ? 'Zoom Meeting Link' : 'Location'}
+                                    </p>
                                       {session.sessionFormat === 'online' ? (
                                         <a
                                           href={session.sessionLocation}
