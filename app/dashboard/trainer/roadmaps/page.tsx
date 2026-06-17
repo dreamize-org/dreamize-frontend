@@ -126,8 +126,27 @@ export default function TrainerRoadmapsPage() {
   };
 
   const handleRoadmapClick = async (roadmap: Roadmap) => {
+    setActionError('');
     setSelectedRoadmap(roadmap);
     setViewMode('detail');
+    await syncSelectedRoadmap(roadmap.id);
+  };
+
+  const canManageMilestones = (roadmap: Roadmap) =>
+    roadmap.status === 'active' || roadmap.status === 'approved';
+
+  const handleEnableNextMilestone = async () => {
+    if (!selectedRoadmap) return;
+
+    const nextLocked = selectedRoadmap.milestones?.find(
+      (milestone) => milestone.status === RoadmapStepStatus.LOCKED
+    );
+    if (!nextLocked) {
+      setActionError('No locked milestones are available to enable.');
+      return;
+    }
+
+    await handleMilestoneLockToggle(nextLocked, false);
   };
 
   const handleBackToList = () => {
@@ -241,6 +260,20 @@ export default function TrainerRoadmapsPage() {
       if (selectedRoadmap) {
         await refreshRoadmaps();
         await syncSelectedRoadmap(selectedRoadmap.id);
+        if (selectedMilestone) {
+          const latest = await roadmapService.getRoadmaps();
+          const refreshedRoadmap = latest?.find((roadmap) => roadmap.id === selectedRoadmap.id);
+          const refreshedMilestone = refreshedRoadmap?.milestones?.find(
+            (milestone) => milestone.order === selectedMilestone.order
+          );
+          if (refreshedMilestone?.status === RoadmapStepStatus.COMPLETED) {
+            setShowApprovalModal(false);
+            setSelectedMilestone(null);
+            setMilestoneProjects([]);
+          } else if (refreshedMilestone) {
+            setSelectedMilestone(refreshedMilestone);
+          }
+        }
       }
       const updated = await projectService.getProjectData(projectId);
       if (updated.data && viewingProjectDetail?.id === projectId) {
@@ -534,6 +567,31 @@ export default function TrainerRoadmapsPage() {
                       {actionError}
                     </div>
                   )}
+                  {selectedRoadmap.status === 'pending-approval' && (
+                    <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      This roadmap is waiting for admin approval. Milestones stay locked until an admin approves and launches it.
+                    </div>
+                  )}
+                  {canManageMilestones(selectedRoadmap) && (
+                    <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-slate-700">
+                        Enable milestones for your student to start submitting work. Only one milestone should be active at a time.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleEnableNextMilestone}
+                        disabled={
+                          isProcessing ||
+                          !selectedRoadmap.milestones?.some(
+                            (milestone) => milestone.status === RoadmapStepStatus.LOCKED
+                          )
+                        }
+                        className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Enable Next Milestone
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-0">
                     {selectedRoadmap.milestones?.map((milestone, index) => {
                       const isLast = index === (selectedRoadmap.milestones?.length || 0) - 1;
@@ -611,8 +669,8 @@ export default function TrainerRoadmapsPage() {
                                 </div>
                                 
                                 {/* Status Dropdown */}
-                                <div className="flex items-center gap-2">
-                                  {selectedRoadmap.status === 'active' && milestone.status === RoadmapStepStatus.ACTIVE && (
+                                <div className="flex items-center gap-2 flex-wrap justify-end">
+                                  {canManageMilestones(selectedRoadmap) && milestone.status === RoadmapStepStatus.ACTIVE && (
                                     <button
                                       type="button"
                                       onClick={() => handleMilestoneLockToggle(milestone, true)}
@@ -622,14 +680,14 @@ export default function TrainerRoadmapsPage() {
                                       Lock
                                     </button>
                                   )}
-                                  {selectedRoadmap.status === 'active' && milestone.status === RoadmapStepStatus.LOCKED && (
+                                  {canManageMilestones(selectedRoadmap) && milestone.status === RoadmapStepStatus.LOCKED && (
                                     <button
                                       type="button"
                                       onClick={() => handleMilestoneLockToggle(milestone, false)}
                                       disabled={isProcessing}
-                                      className="px-3 py-2 border border-primary/20 rounded-xl text-sm bg-primary/5 text-primary hover:bg-primary/10 disabled:opacity-50"
+                                      className="px-3 py-2 border border-primary/20 rounded-xl text-sm bg-primary text-slate-900 font-semibold hover:bg-primary/90 disabled:opacity-50"
                                     >
-                                      Unlock
+                                      Enable Milestone
                                     </button>
                                   )}
 
@@ -807,7 +865,7 @@ export default function TrainerRoadmapsPage() {
                           <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                           <p className="text-sm text-orange-700">
                             <span className="font-medium">Step 1:</span> Review and approve each submitted project below.{' '}
-                            <span className="font-medium">Step 2:</span> Once all projects are approved, use Approve Milestone.
+                            <span className="font-medium">Step 2:</span> The milestone completes automatically once all projects are approved (a certificate is issued to the student).
                           </p>
                         </div>
                       )}
