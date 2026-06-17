@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useRoadmaps } from '@/contexts';
+import { useAuth, useRoadmaps, useProjects } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { Milestone, UserRole, RoadmapStepStatus, Roadmap } from '@/types';
 import { roadmapService } from '@/services/roadmap';
@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 function CreatePageContent() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { studentRoadmaps, isLoading: roadmapsLoading, refreshRoadmaps } = useRoadmaps();
+  const { refreshProjects } = useProjects();
   const { navigate } = useNavigationWithLoading();
   const searchParams = useSearchParams();
 
@@ -24,6 +25,7 @@ function CreatePageContent() {
   const [selectedMilestone, setSelectedMilestone] = useState<Milestone | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const [projectSubmission, setProjectSubmission] = useState({
     title: '',
@@ -127,20 +129,24 @@ function CreatePageContent() {
 
   const handleProjectSubmit = async () => {
     if (!selectedMilestone || !projectSubmission.title.trim() || !projectSubmission.description.trim() || !selectedRoadmap) {
+      setSubmitError('Please select a milestone and fill in the project title and description.');
       return;
     }
+
+    if (
+      selectedMilestone.status !== RoadmapStepStatus.ACTIVE &&
+      selectedMilestone.status !== RoadmapStepStatus.LOCKED
+    ) {
+      setSubmitError('You can only submit projects for active milestones.');
+      return;
+    }
+
     setLoading(true);
+    setSubmitError('');
     try {
-      // Submit project and complete milestone
       await roadmapService.completeMilestone(selectedRoadmap.id, selectedMilestone.order, projectSubmission);
-
-      // Refresh roadmaps to get updated data
-      await refreshRoadmaps();
-
-      // Show success modal/notification
+      await Promise.all([refreshRoadmaps(), refreshProjects()]);
       setSuccess(true);
-
-      // Reset state except selected roadmap to allow another milestone submission if needed
       setSelectedMilestone(null);
       setProjectSubmission({
         title: '',
@@ -154,19 +160,22 @@ function CreatePageContent() {
           designLink: '',
           documentationLink: '',
           fileDownloadLink: '',
-          externalLink: ''
+          externalLink: '',
         },
         attachments: {
           images: [],
-          pdfs: []
-        }
+          pdfs: [],
+        },
       });
     } catch (error) {
-      console.error('Failed to complete milestone:', error);
+      setSubmitError(error instanceof Error ? error.message : 'Failed to submit project. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  const canSelectMilestone = (status: RoadmapStepStatus) =>
+    status === RoadmapStepStatus.ACTIVE || status === RoadmapStepStatus.LOCKED;
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-gradient-to-br from-blue-50/20 via-[#fafaf7] to-[#FDF9F2] overflow-hidden">
@@ -304,8 +313,19 @@ function CreatePageContent() {
                         return (
                           <div
                             key={milestone.order}
-                            onClick={() => setSelectedMilestone(milestone)}
-                            className={`p-4 rounded-2xl border-2 transition-all cursor-pointer text-left relative ${
+                            onClick={() => {
+                              if (!canSelectMilestone(milestone.status)) {
+                                setSubmitError('This milestone is not open for submission yet.');
+                                return;
+                              }
+                              setSubmitError('');
+                              setSelectedMilestone(milestone);
+                            }}
+                            className={`p-4 rounded-2xl border-2 transition-all text-left relative ${
+                              !canSelectMilestone(milestone.status)
+                                ? 'opacity-60 cursor-not-allowed'
+                                : 'cursor-pointer'
+                            } ${
                               isSelected
                                 ? 'bg-primary/5 border-primary shadow-md scale-[1.01]'
                                 : 'bg-slate-50/50 border-slate-100 hover:bg-slate-50 hover:border-slate-200'
@@ -792,7 +812,11 @@ function CreatePageContent() {
                       </div>
 
                       {/* Sticky Footer */}
-                      <div className="bg-slate-50/80 backdrop-blur-md border-t border-slate-100 p-6 flex justify-between items-center">
+                      <div className="bg-slate-50/80 backdrop-blur-md border-t border-slate-100 p-6">
+                        {submitError && (
+                          <p className="mb-3 text-xs text-red-500">{submitError}</p>
+                        )}
+                        <div className="flex justify-between items-center">
                         <p className="text-[10px] text-slate-400">
                           <span className="text-red-500">*</span> Required fields
                         </p>
@@ -822,6 +846,7 @@ function CreatePageContent() {
                               </>
                             )}
                           </button>
+                        </div>
                         </div>
                       </div>
                     </motion.div>

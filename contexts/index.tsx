@@ -2,6 +2,7 @@ export { AuthProvider, useAuth } from './AuthContext';
 export { AdminProvider, useAdminContext } from './AdminContext';
 export { UserProvider, useUsers } from './UserContext';
 export { RoadmapProvider, useRoadmaps } from './RoadmapContext';
+export { ProjectProvider, useProjects } from './ProjectContext';
 export { FinancialProvider, useFinancial } from './FinancialContext';
 export { SystemProvider, useSystem } from './SystemContext';
 

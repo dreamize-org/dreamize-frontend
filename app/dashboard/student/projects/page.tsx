@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from '@/hooks/useRouter';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useProjects } from '@/contexts/ProjectContext';
+import { getProjectStudentId } from '@/services/project';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole, ProjectStatus, type Project } from '@/types';
 import {
@@ -45,7 +46,7 @@ export default function StudentProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // Filter projects for current student
-  const studentProjects = projects.filter(p => p.student._id === user?._id);
+  const studentProjects = projects.filter((p) => getProjectStudentId(p) === user?._id);
 
   // Apply filters
   const filteredProjects = studentProjects.filter(project => {
