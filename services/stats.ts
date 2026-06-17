@@ -2,11 +2,26 @@ import { apiClient } from './client';
 import { API_ENDPOINTS } from './constants';
 import { ApiResponse } from '@/types/api';
 
-export interface StatsResponse {
-  student?: { activeRoadmaps: number; completedSessions: number; upcomingSessions: number; roadmapProgress: number };
-  trainer?: { assignedStudents: number; totalSessionsConducted: number; upcomingSessions: number; walletBalance: number };
-  admin?: { totalUsersByRole: Record<string, number>; totalRevenue: number; activeRoadmaps: number; completedSessions: number };
+export interface StudentStats {
+  activeRoadmaps: number;
+  roadmapProgress: number;
+  totalMilestones?: number;
+  completedMilestones?: number;
 }
+
+export interface TrainerStats {
+  assignedStudents: number;
+  pendingBookings?: number;
+  upcomingSessions?: number;
+}
+
+export interface AdminStats {
+  totalUsersByRole: Record<string, number>;
+  totalRevenue: number;
+  activeRoadmaps: number;
+}
+
+export type StatsResponse = StudentStats | TrainerStats | AdminStats;
 
 class StatsService {
   async getMyStats(): Promise<ApiResponse<StatsResponse>> {

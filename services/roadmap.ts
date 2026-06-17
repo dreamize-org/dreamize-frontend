@@ -55,12 +55,18 @@ class RoadmapService {
     }
 
     async approveMilestone(roadmapId: string, milestoneOrder: number, trainerFeedback: string) {
-        const response = await apiClient.post<Roadmap>(API_ENDPOINTS.MILESTONE_APPROVE(roadmapId, milestoneOrder), { trainerFeedback });
+        const response = await apiClient.post<Roadmap>(API_ENDPOINTS.MILESTONE_APPROVE(roadmapId, milestoneOrder), {
+            feedback: trainerFeedback,
+            trainerFeedback,
+        });
         return response.data;
     }
 
     async rejectMilestone(roadmapId: string, milestoneOrder: number, trainerFeedback: string) {
-        const response = await apiClient.post<Roadmap>(`/api/roadmaps/${roadmapId}/milestones/${milestoneOrder}/reject`, { trainerFeedback });
+        const response = await apiClient.post<Roadmap>(`/api/roadmaps/${roadmapId}/milestones/${milestoneOrder}/reject`, {
+            feedback: trainerFeedback,
+            trainerFeedback,
+        });
         return response.data;
     }
 

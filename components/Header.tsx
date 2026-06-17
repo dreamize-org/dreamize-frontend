@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, X, Search } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useRouter } from '@/hooks/useRouter';
 import { useState, useEffect } from "react";
 import { Logo } from "./ui/Logo";
@@ -51,11 +51,6 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-6">
-            {/* Search Stub */}
-            <button className={`p-2 transition-colors ${isScrolled ? "text-white/70 hover:text-white" : "text-white/50 hover:text-white"}`}>
-              <Search size={20} />
-            </button>
-
             {/* CTA Buttons */}
             <div className="hidden md:flex items-center space-x-6">
               <button

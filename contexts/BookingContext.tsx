@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { Booking, TrainerApprovalRequest } from "@/types/booking";
 import { bookingService } from "@/services/booking";
 import { useAuth } from "./AuthContext";
+import { UserRole } from "@/types";
 
 interface BookingContextType {
     trainerPendingBookings: Booking[];
@@ -13,35 +14,35 @@ interface BookingContextType {
     error: string | null;
     approveBooking: (bookingId: string, approvalData: TrainerApprovalRequest) => Promise<void>;
     rejectBooking: (bookingId: string, reason: string) => Promise<void>;
+    cancelBooking: (bookingId: string) => Promise<void>;
     refreshBookings: () => Promise<void>;
 }
 
 const BookingContext = createContext<BookingContextType | null>(null);
 
 export const BookingProvider = ({ children }: { children: React.ReactNode }) => {
-    const [loading, setLoading] = useState<boolean>(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [trainerPendingBookings, setTrainerPendingBookings] = useState<Booking[]>([]);
     const [trainerAllBookings, setTrainerAllBookings] = useState<Booking[]>([]);
     const [studentBookings, setStudentBookings] = useState<Booking[]>([]);
-    const { user } = useAuth()
+    const { user, isLoading: authLoading } = useAuth();
 
-    const fetchStudentBookings = async () => {
+    const fetchStudentBookings = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
             const response = await bookingService.getStudentBookings();
-            if (response.data) {
-                setStudentBookings(response.data);
-            }
+            setStudentBookings(response.data ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch student bookings');
+            setStudentBookings([]);
         } finally {
             setLoading(false);
         }
-    }
+    }, []);
 
-    const fetchTrainerBookings = async () => {
+    const fetchTrainerBookings = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -50,34 +51,43 @@ export const BookingProvider = ({ children }: { children: React.ReactNode }) => 
                 bookingService.getTrainerAllBookings(),
             ]);
 
-            if (pendingResponse.data) {
-                setTrainerPendingBookings(pendingResponse.data);
-            }
-            if (allResponse.data) {
-                setTrainerAllBookings(allResponse.data);
-            }
+            setTrainerPendingBookings(pendingResponse.data ?? []);
+            setTrainerAllBookings(allResponse.data ?? []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch bookings');
+            setTrainerPendingBookings([]);
+            setTrainerAllBookings([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        if (user?.role === 'student') {
+        if (authLoading) return;
+
+        if (user?.role === UserRole.STUDENT) {
             fetchStudentBookings();
-        } else if (user?.role === 'trainer') {
-            fetchTrainerBookings();
+            return;
         }
 
-    }, [user?._id]);
+        if (user?.role === UserRole.TRAINER) {
+            fetchTrainerBookings();
+            return;
+        }
+
+        setLoading(false);
+        setStudentBookings([]);
+        setTrainerPendingBookings([]);
+        setTrainerAllBookings([]);
+    }, [authLoading, user?.role, user?._id, fetchStudentBookings, fetchTrainerBookings]);
 
     const approveBooking = async (bookingId: string, approvalData: TrainerApprovalRequest) => {
         try {
             await bookingService.approveBooking(bookingId, approvalData);
-            await fetchTrainerBookings()
+            await fetchTrainerBookings();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to approve booking');
+            const message = err instanceof Error ? err.message : 'Failed to approve booking';
+            setError(message);
             throw err;
         }
     };
@@ -85,17 +95,29 @@ export const BookingProvider = ({ children }: { children: React.ReactNode }) => 
     const rejectBooking = async (bookingId: string, reason: string) => {
         try {
             await bookingService.rejectBooking(bookingId, reason);
-            await fetchTrainerBookings(); // Refresh bookings
+            await fetchTrainerBookings();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to reject booking');
+            const message = err instanceof Error ? err.message : 'Failed to reject booking';
+            setError(message);
+            throw err;
+        }
+    };
+
+    const cancelBooking = async (bookingId: string) => {
+        try {
+            await bookingService.cancelBooking(bookingId);
+            await fetchStudentBookings();
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to cancel booking';
+            setError(message);
             throw err;
         }
     };
 
     const refreshBookings = async () => {
-        if (user?.role === 'student') {
+        if (user?.role === UserRole.STUDENT) {
             await fetchStudentBookings();
-        } else if (user?.role === 'trainer') {
+        } else if (user?.role === UserRole.TRAINER) {
             await fetchTrainerBookings();
         }
     };
@@ -105,10 +127,11 @@ export const BookingProvider = ({ children }: { children: React.ReactNode }) => 
             trainerPendingBookings,
             trainerAllBookings,
             studentBookings,
-            loading,
+            loading: authLoading || loading,
             error,
             approveBooking,
             rejectBooking,
+            cancelBooking,
             refreshBookings
         }}>
             {children}

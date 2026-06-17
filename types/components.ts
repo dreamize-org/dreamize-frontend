@@ -2,15 +2,22 @@ import type { ReactNode } from "react";
 import { UserRole, OnboardingChecklist } from "./user";
 
 export interface SidebarItem {
+  id: string;
   icon: ReactNode;
   label: string;
   href: string;
   active?: boolean;
+  exact?: boolean;
+  matchPaths?: string[];
   hasDropdown?: boolean;
   badge?: string;
   disabled?: boolean;
   disabledReason?: string;
 }
+
+export type SidebarNavEntry =
+  | SidebarItem
+  | { type: 'section'; label: string };
 
 export interface SidebarProps {
   activeItem?: string;

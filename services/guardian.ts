@@ -59,6 +59,14 @@ class GuardianService {
   async getStudentDetails(studentId: string): Promise<ApiResponse<Student>> {
     return apiClient.get<Student>(API_ENDPOINTS.GUARDIAN_STUDENT_BY_ID(studentId));
   }
+
+  async getStudentCertificates(studentId: string) {
+    return apiClient.get(API_ENDPOINTS.GUARDIAN_STUDENT_CERTIFICATES(studentId));
+  }
+
+  async getStudentProjects(studentId: string) {
+    return apiClient.get(API_ENDPOINTS.GUARDIAN_STUDENT_PROJECTS(studentId));
+  }
 }
 
 export const guardianService = new GuardianService();

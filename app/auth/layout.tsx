@@ -1,16 +1,12 @@
-'use client'
+'use client';
 
-import { useAuth } from "@/contexts/AuthContext"
-import { useEffect } from "react";
+import { useRedirectIfAuthenticated } from '@/hooks/useRequireAuth';
 
 export default function AuthLayout({
-    children,
+  children,
 }: {
-    children: React.ReactNode;
+  children: React.ReactNode;
 }) {
-    const { handleDashboardRedirect, isAuthenticated } = useAuth();
-    useEffect(() => {
-        handleDashboardRedirect();
-    }, [isAuthenticated]);
-    return children
+  useRedirectIfAuthenticated();
+  return children;
 }

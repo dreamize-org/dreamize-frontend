@@ -18,7 +18,8 @@ export default function PendingApprovalContent() {
         router.push('/auth/login');
     };
 
-    const handleBackToLogin = () => {
+    const handleBackToLogin = async () => {
+        await logout();
         router.push('/auth/login');
     };
 

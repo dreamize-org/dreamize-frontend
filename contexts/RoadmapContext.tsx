@@ -29,7 +29,6 @@ export const RoadmapProvider = ({ children }: { children: React.ReactNode }) => 
             setLoading(true);
             setError(null);
             const response = await roadmapService.getRoadmaps();
-            console.log(response)
             setRoadmaps(response || []);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to fetch roadmaps');

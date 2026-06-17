@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './constants';
-import { ApiResponse, BaseUser, Trainer, Student } from '@/types';
+import { ApiResponse, BaseUser, Trainer, Student, Payment } from '@/types';
 import { Roadmap } from '@/types/roadmap';
 
 // Admin-specific types
@@ -15,11 +15,16 @@ export interface AdminPayment {
 }
 
 export interface AdminAnalytics {
-  totalUsers: number;
-  totalTrainers: number;
-  totalStudents: number;
+  usersByRole: {
+    student: number;
+    trainer: number;
+  };
   totalRevenue: number;
+  monthlyRevenue: number;
+  activeRoadmaps: number;
   pendingTrainers: number;
+  activeSubscriptions: number;
+  totalCertificates: number;
 }
 
 export interface FeedbackTicket {
@@ -90,133 +95,116 @@ class AdminService {
 
   // Payments Management
   async getPayments(): Promise<ApiResponse<AdminPayment[]>> {
-    // For now, return mock data since the endpoint might not exist
-    const mockPayments: AdminPayment[] = [
-      {
-        _id: '1',
-        userId: 'user1',
-        amount: 50000,
-        type: 'orientation',
-        status: 'completed',
-        createdAt: new Date().toISOString(),
-      },
-      {
-        _id: '2',
-        userId: 'user2',
-        amount: 100000,
-        type: 'subscription',
-        status: 'pending',
-        createdAt: new Date().toISOString(),
-      }
-    ];
+    const response = await apiClient.get<Payment[]>(API_ENDPOINTS.ADMIN_PAYMENTS);
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        data: [],
+        message: response.message || 'Failed to load payments',
+      };
+    }
+
+    const payments: AdminPayment[] = response.data.map((payment) => ({
+      _id: payment.id,
+      userId: payment.student?._id || '',
+      amount: payment.finalAmount ?? payment.amount,
+      type: payment.type,
+      status:
+        payment.status === 'success'
+          ? 'completed'
+          : payment.status === 'failed'
+            ? 'failed'
+            : 'pending',
+      createdAt: new Date(payment.paidAt).toISOString(),
+      completedAt: payment.status === 'success' ? new Date(payment.paidAt).toISOString() : undefined,
+    }));
 
     return {
       success: true,
-      data: mockPayments,
-      message: 'Payments retrieved successfully'
+      data: payments,
+      message: 'Payments retrieved successfully',
     };
   }
 
   async updatePaymentStatus(paymentId: string, status: 'completed' | 'failed'): Promise<ApiResponse<AdminPayment>> {
-    // This would typically call an API endpoint
-    // For now, return a mock response
+    if (status !== 'completed') {
+      return {
+        success: false,
+        data: {
+          _id: paymentId,
+          userId: '',
+          amount: 0,
+          type: 'orientation',
+          status: 'failed',
+          createdAt: new Date().toISOString(),
+        },
+        message: 'Only payment confirmation is supported',
+      };
+    }
+
+    const response = await apiClient.post<Payment>(`${API_ENDPOINTS.ADMIN_PAYMENTS}/${paymentId}/confirm`, {});
+    if (!response.success || !response.data) {
+      return {
+        success: false,
+        data: {
+          _id: paymentId,
+          userId: '',
+          amount: 0,
+          type: 'orientation',
+          status: 'pending',
+          createdAt: new Date().toISOString(),
+        },
+        message: response.message || 'Failed to confirm payment',
+      };
+    }
+
+    const payment = response.data;
     return {
       success: true,
       data: {
-        _id: paymentId,
-        userId: 'user1',
-        amount: 50000,
-        type: 'orientation',
-        status,
-        createdAt: new Date().toISOString(),
-        completedAt: status === 'completed' ? new Date().toISOString() : undefined
+        _id: payment.id,
+        userId: payment.student?._id || '',
+        amount: payment.finalAmount ?? payment.amount,
+        type: payment.type,
+        status: 'completed',
+        createdAt: new Date(payment.paidAt).toISOString(),
+        completedAt: new Date(payment.paidAt).toISOString(),
       },
-      message: `Payment status updated to ${status}`
+      message: 'Payment confirmed successfully',
     };
   }
 
   // Analytics
   async getAnalytics(): Promise<ApiResponse<AdminAnalytics>> {
-    // Calculate analytics from users data
-    const usersResponse = await this.getUsers();
-    const trainersResponse = await this.getTrainers();
-    const paymentsResponse = await this.getPayments();
+    return apiClient.get<AdminAnalytics>(API_ENDPOINTS.ADMIN_ANALYTICS);
+  }
 
-    if (!usersResponse.data || !trainersResponse.data || !paymentsResponse.data) {
-      return {
-        success: false,
-        data: {
-          totalUsers: 0,
-          totalTrainers: 0,
-          totalStudents: 0,
-          totalRevenue: 0,
-          pendingTrainers: 0
-        },
-        message: 'Failed to calculate analytics'
-      };
-    }
+  async getCertificates(search?: string): Promise<ApiResponse<import('./certificates').CertificateRecord[]>> {
+    const suffix = search ? `?search=${encodeURIComponent(search)}` : '';
+    return apiClient.get(`${API_ENDPOINTS.ADMIN_CERTIFICATES}${suffix}`);
+  }
 
-    const analytics: AdminAnalytics = {
-      totalUsers: usersResponse.data.length,
-      totalTrainers: trainersResponse.data.length,
-      totalStudents: usersResponse.data.filter(u => u.role === 'student').length,
-      totalRevenue: paymentsResponse.data.reduce((sum, p) => p.status === 'completed' ? sum + p.amount : sum, 0),
-      pendingTrainers: trainersResponse.data.filter(t => t.approvalStatus === 'pending').length,
-    };
-
+  // Feedback & Support — no backend module yet; return empty list instead of mock data
+  async getFeedbackTickets(): Promise<ApiResponse<FeedbackTicket[]>> {
     return {
       success: true,
-      data: analytics,
-      message: 'Analytics retrieved successfully'
+      data: [],
+      message: 'Feedback module not configured',
     };
   }
 
-  // Feedback & Support
-  async getFeedbackTickets(): Promise<ApiResponse<FeedbackTicket[]>> {
-    // For now, return mock data since the endpoint might not exist
-    const mockTickets: FeedbackTicket[] = [
-      {
-        _id: '1',
-        userId: 'user1',
-        subject: 'Login Issue',
-        message: 'User cannot login to their account',
+  async updateTicketStatus(_ticketId: string, _status: FeedbackTicket['status']): Promise<ApiResponse<FeedbackTicket>> {
+    return {
+      success: false,
+      data: {
+        _id: _ticketId,
+        userId: '',
+        subject: '',
+        message: '',
         status: 'open',
         createdAt: new Date().toISOString(),
       },
-      {
-        _id: '2',
-        userId: 'user2',
-        subject: 'Payment Problem',
-        message: 'Payment was processed but subscription not activated',
-        status: 'in_progress',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }
-    ];
-
-    return {
-      success: true,
-      data: mockTickets,
-      message: 'Feedback tickets retrieved successfully'
-    };
-  }
-
-  async updateTicketStatus(ticketId: string, status: FeedbackTicket['status']): Promise<ApiResponse<FeedbackTicket>> {
-    // This would typically call an API endpoint
-    // For now, return a mock response
-    return {
-      success: true,
-      data: {
-        _id: ticketId,
-        userId: 'user1',
-        subject: 'Login Issue',
-        message: 'User cannot login to their account',
-        status,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        resolvedAt: status === 'resolved' ? new Date().toISOString() : undefined
-      },
-      message: `Ticket status updated to ${status}`
+      message: 'Feedback module not configured',
     };
   }
 
@@ -278,11 +266,13 @@ class AdminService {
           students: [],
           payments: [],
           analytics: {
-            totalUsers: 0,
-            totalTrainers: 0,
-            totalStudents: 0,
+            usersByRole: { student: 0, trainer: 0 },
             totalRevenue: 0,
-            pendingTrainers: 0
+            monthlyRevenue: 0,
+            activeRoadmaps: 0,
+            pendingTrainers: 0,
+            activeSubscriptions: 0,
+            totalCertificates: 0,
           },
           tickets: [],
           roadmaps: []

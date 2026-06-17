@@ -215,12 +215,12 @@ export default function StudentsTable({ searchQuery, selectedStatus }: StudentsT
     setSelectedStudents(selectedItems);
   };
 
-  const handleFilterChange = (filters: Record<string, unknown>) => {
-    console.log('Filters:', filters);
+  const handleFilterChange = (_filters: Record<string, unknown>) => {
+    // Client-side filtering is handled in the table component
   };
 
-  const handleSearchChange = (searchQuery: string) => {
-    console.log('Search:', searchQuery);
+  const handleSearchChange = (_searchQuery: string) => {
+    // Client-side search is handled in the table component
   };
 
   return (
@@ -228,17 +228,10 @@ export default function StudentsTable({ searchQuery, selectedStatus }: StudentsT
       {/* Selected Actions */}
       {selectedStudents.length > 0 && (
         <div className="bg-primary/5 border border-primary/20 rounded-[20px] p-4 animate-in fade-in slide-in-from-top-2">
-          <div className="flex items-center justify-between">
-            <span className="text-[13px] font-black text-slate-900 flex items-center gap-2">
-              <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-              {selectedStudents.length} Mentee{selectedStudents.length > 1 ? 's' : ''} Selected
-            </span>
-            <div className="flex items-center gap-3">
-              <button className="px-6 py-2.5 bg-slate-900 text-white font-bold text-[11px] uppercase tracking-widest rounded-xl hover:bg-slate-800 transition-colors">
-                Transmit Message
-              </button>
-            </div>
-          </div>
+          <span className="text-[13px] font-black text-slate-900 flex items-center gap-2">
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+            {selectedStudents.length} Mentee{selectedStudents.length > 1 ? 's' : ''} Selected
+          </span>
         </div>
       )}
 

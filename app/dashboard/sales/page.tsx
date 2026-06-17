@@ -1,16 +1,19 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useUsers } from '@/contexts';
+import { useAuth } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
-import { Users, Phone, Calendar, ArrowRight, TrendingUp, Clock, UserCheck } from 'lucide-react';
+import { Users, Phone, Calendar, ArrowRight, TrendingUp, Clock, UserCheck, Loader2 } from 'lucide-react';
 import { UserRole } from '@/types/user';
+import { salesService, type SalesLeadRecord } from '@/services';
+import { LeadStatus } from '@/types/dashboard';
 
 export default function SalesManagerDashboard() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { students, isLoading: usersLoading } = useUsers();
   const { navigate } = useNavigationWithLoading();
+  const [dashboard, setDashboard] = useState<{ totalFreeSignups: number; conversionRate: number; leads: SalesLeadRecord[] } | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Redirect if not authenticated or not a sales manager
   useEffect(() => {
@@ -30,7 +33,20 @@ export default function SalesManagerDashboard() {
     }
   }, [authLoading, isAuthenticated, user, navigate]);
 
-  const isLoading = authLoading || usersLoading;
+  useEffect(() => {
+    if (user?.role === 'sales_manager') {
+      salesService
+        .getDashboard()
+        .then((response) => {
+          if (response.success && response.data) {
+            setDashboard(response.data);
+          }
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [user?.role]);
+
+  const isLoading = authLoading || loading;
 
   if (isLoading) {
     return (
@@ -55,11 +71,11 @@ export default function SalesManagerDashboard() {
     return null;
   }
 
-  // Filter for free users (students who haven't paid orientation)
-  const freeLeads = students?.filter(s => !s.hasPaidOrientation) || [];
-  const paidStudents = students?.filter(s => s.hasPaidOrientation) || [];
-  const totalLeads = freeLeads.length;
-  const conversionRate = students?.length > 0 ? ((paidStudents.length / students.length) * 100).toFixed(1) : '0';
+  // Filter for open CRM leads
+  const freeLeads = dashboard?.leads.filter((lead) => lead.status !== LeadStatus.SUBSCRIBED && lead.status !== LeadStatus.LOST) || [];
+  const paidStudents = dashboard?.leads.filter((lead) => lead.status === LeadStatus.SUBSCRIBED) || [];
+  const totalLeads = dashboard?.totalFreeSignups ?? freeLeads.length;
+  const conversionRate = dashboard?.conversionRate ?? 0;
 
   const stats = [
     { label: 'Free Leads', value: totalLeads, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
@@ -145,21 +161,21 @@ export default function SalesManagerDashboard() {
                          <div className="flex items-center justify-between">
                            <div className="flex items-center gap-4">
                              <div className="w-12 h-12 bg-blue-500 rounded-[18px] flex items-center justify-center text-white font-black text-sm">
-                               {lead.firstName.charAt(0)}{lead.lastName.charAt(0)}
+                               {lead.fullName.split(' ').map((part) => part.charAt(0)).join('').slice(0, 2)}
                              </div>
                              <div>
-                               <div className="font-bold text-slate-900">{lead.firstName} {lead.lastName}</div>
+                               <div className="font-bold text-slate-900">{lead.fullName}</div>
                                <div className="text-[13px] text-slate-500 font-light">{lead.email}</div>
                              </div>
                            </div>
                            <div className="flex items-center gap-6">
                              <div className="flex items-center gap-2 text-[13px] text-slate-600">
                                <Phone size={14} className="text-slate-400" />
-                               {lead.phoneNumber || 'N/A'}
+                               {lead.phone || 'N/A'}
                              </div>
                              <div className="flex items-center gap-2 text-[13px] text-slate-600">
                                <Calendar size={14} className="text-slate-400" />
-                               {new Date(lead.createdAt).toLocaleDateString()}
+                               {new Date(lead.signupDate).toLocaleDateString()}
                              </div>
                            </div>
                          </div>

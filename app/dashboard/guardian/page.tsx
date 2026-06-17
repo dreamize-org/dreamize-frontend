@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth } from '@/contexts/AuthContext';
 import { guardianService } from '@/services/guardian';
+import { certificateService } from '@/services/certificates';
+import type { CertificateRecord } from '@/services/certificates';
 import { useRoadmaps } from '@/contexts/RoadmapContext';
 import { UserRole, Student, Roadmap, RoadmapStepStatus } from '@/types';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
@@ -19,17 +21,24 @@ import {
   UserCircle,
   GraduationCap,
   Folder,
-  ArrowRight,
   ShieldCheck,
   Search,
   Zap,
-  Lock,
-  FileText
+  Lock
 } from 'lucide-react';
 
 interface StudentWithDetails extends Student {
   roadmap?: Roadmap;
   progress?: number;
+}
+
+interface GuardianProject {
+  _id: string;
+  title: string;
+  description: string;
+  category: string;
+  trainerFeedback?: string;
+  approvedAt?: string;
 }
 
 export default function GuardianDashboard() {
@@ -41,6 +50,9 @@ export default function GuardianDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<StudentWithDetails | null>(null);
+  const [studentCertificates, setStudentCertificates] = useState<CertificateRecord[]>([]);
+  const [studentProjects, setStudentProjects] = useState<GuardianProject[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   // Fetch linked students
   useEffect(() => {
@@ -78,6 +90,43 @@ export default function GuardianDashboard() {
 
     fetchStudents();
   }, [isAuthenticated, studentRoadmaps]);
+
+  useEffect(() => {
+    if (!selectedStudent?._id) {
+      setStudentCertificates([]);
+      setStudentProjects([]);
+      return;
+    }
+
+    const loadStudentDetails = async () => {
+      setDetailLoading(true);
+      try {
+        const [certificatesRes, projectsRes] = await Promise.all([
+          guardianService.getStudentCertificates(selectedStudent._id),
+          guardianService.getStudentProjects(selectedStudent._id),
+        ]);
+
+        if (certificatesRes.success && certificatesRes.data) {
+          setStudentCertificates(certificatesRes.data as CertificateRecord[]);
+        } else {
+          setStudentCertificates([]);
+        }
+
+        if (projectsRes.success && projectsRes.data) {
+          setStudentProjects(projectsRes.data as GuardianProject[]);
+        } else {
+          setStudentProjects([]);
+        }
+      } catch {
+        setStudentCertificates([]);
+        setStudentProjects([]);
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+
+    loadStudentDetails();
+  }, [selectedStudent?._id]);
 
   // Redirect if not guardian
   useEffect(() => {
@@ -323,6 +372,74 @@ export default function GuardianDashboard() {
                        )}
                     </div>
 
+                    {/* Certificates */}
+                    <div className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm">
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <Award size={24} className="text-primary" />
+                        Certificates
+                      </h3>
+                      {detailLoading ? (
+                        <p className="text-slate-400 italic">Loading certificates...</p>
+                      ) : studentCertificates.length === 0 ? (
+                        <p className="text-slate-400 italic">No certificates earned yet.</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {studentCertificates.map((certificate) => (
+                            <div key={certificate._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">
+                                {certificate.certificateNumber}
+                              </p>
+                              <h4 className="font-bold text-slate-900">{certificate.milestoneName}</h4>
+                              <p className="text-sm text-slate-500 mt-1">
+                                {new Date(certificate.completionDate).toLocaleDateString()}
+                              </p>
+                              <button
+                                onClick={() =>
+                                  certificateService.downloadCertificate(
+                                    certificate._id,
+                                    certificate.certificateNumber
+                                  )
+                                }
+                                className="mt-4 text-xs font-bold uppercase tracking-widest text-primary hover:underline"
+                              >
+                                Download PDF
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Approved Projects */}
+                    <div className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-sm">
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                        <Folder size={24} className="text-primary" />
+                        Approved Projects
+                      </h3>
+                      {detailLoading ? (
+                        <p className="text-slate-400 italic">Loading projects...</p>
+                      ) : studentProjects.length === 0 ? (
+                        <p className="text-slate-400 italic">No approved projects yet.</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {studentProjects.map((project) => (
+                            <div key={project._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                                {project.category}
+                              </p>
+                              <h4 className="font-bold text-slate-900">{project.title}</h4>
+                              <p className="text-sm text-slate-600 mt-2">{project.description}</p>
+                              {project.trainerFeedback && (
+                                <p className="mt-3 text-sm text-slate-500 italic border-l-4 border-primary pl-3">
+                                  &quot;{project.trainerFeedback}&quot;
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
                     {/* Subscription & Finance Card */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                        <div className="bg-slate-900 rounded-[32px] p-8 border border-slate-800 shadow-xl relative overflow-hidden group">
@@ -351,19 +468,7 @@ export default function GuardianDashboard() {
                              )}
                           </div>
                        </div>
-
-                       <div className="bg-white rounded-[32px] p-8 border border-slate-100 flex flex-col justify-center items-center text-center group hover:border-primary/20 transition-all">
-                          <div className="w-16 h-16 bg-slate-50 rounded-[24px] flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all mb-4">
-                             <FileText size={28} />
-                          </div>
-                          <h4 className="text-slate-900 font-bold">Download Report</h4>
-                          <p className="text-slate-500 text-[13px] mt-1 font-light leading-snug">Generate a detailed progress PDF for {selectedStudent.firstName}.</p>
-                          <button className="mt-6 flex items-center gap-2 text-xs font-bold text-primary tracking-widest uppercase">
-                             GENERATE PDF <ArrowRight size={14} />
-                          </button>
-                       </div>
                     </div>
-
                   </div>
                 )}
               </div>

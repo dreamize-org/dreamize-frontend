@@ -1,6 +1,6 @@
 'use client';
 
-import { Search, Filter, Download, X } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 
 interface StudentsFiltersProps {
   searchQuery: string;
@@ -38,7 +38,7 @@ export default function StudentsFilters({
         </div>
 
         {/* Filters & Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 lg:w-[450px]">
+        <div className="flex flex-col sm:flex-row gap-4 lg:w-[320px]">
           {/* Status Filter */}
           <div className="relative flex-1 group">
             <Filter className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2 group-focus-within:text-primary transition-colors z-10" />
@@ -54,12 +54,6 @@ export default function StudentsFilters({
               ))}
             </select>
           </div>
-
-          {/* Export Button */}
-          <button className="flex items-center justify-center gap-2 px-8 py-4 bg-slate-900 text-white font-bold text-[13px] rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10">
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline uppercase tracking-widest">Export</span>
-          </button>
         </div>
       </div>
 

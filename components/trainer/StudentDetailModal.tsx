@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import {
   X, Phone, Calendar, GraduationCap, CheckCircle, XCircle, AlertCircle,
-  Clock, MapPin, ArrowRight, BookOpen, Wallet, Zap, Shield, Target
+  Clock, MapPin, BookOpen, Wallet, Zap, Shield, Target
 } from 'lucide-react';
 import { Student, Roadmap } from '@/types';
 import { RoadmapStepStatus } from '@/types/roadmap';
@@ -275,10 +275,7 @@ export default function StudentDetailModal({ student, roadmap, onClose }: Studen
                         <BookOpen className="w-8 h-8 text-slate-300" />
                      </div>
                      <h3 className="text-lg font-black text-slate-900 mb-2">No Architecture Assigned</h3>
-                     <p className="text-[13px] font-medium text-slate-500 mb-6">This mentee has not been assigned a learning roadmap yet.</p>
-                     <button className="px-6 py-3 bg-primary text-slate-900 rounded-xl font-bold text-[13px] hover:bg-primary/90 transition-all flex items-center gap-2 mx-auto shadow-lg shadow-primary/20">
-                        Assign Roadmap <ArrowRight size={16} />
-                     </button>
+                     <p className="text-[13px] font-medium text-slate-500">This mentee has not been assigned a learning roadmap yet.</p>
                   </div>
                 )}
 
@@ -321,9 +318,6 @@ export default function StudentDetailModal({ student, roadmap, onClose }: Studen
                className="px-8 py-3.5 bg-slate-100 text-slate-700 rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-slate-200 transition-colors"
              >
                Close Viewer
-             </button>
-             <button className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-xl shadow-slate-900/10">
-               Message Mentee
              </button>
           </div>
         </div>

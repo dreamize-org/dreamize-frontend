@@ -51,13 +51,16 @@ class ApiClient {
       });
 
       if (res.status === HTTP_STATUS.UNAUTHORIZED || res.status === HTTP_STATUS.FORBIDDEN) {
-        // localStorage.removeItem('auth_token');
         this.logoutListeners.forEach(cb => { try { cb(); } catch { /* ignore */ } });
         throw new Error(`HTTP ${res.status}`);
       }
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res.json() as Promise<ApiResponse<T>>;
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        const message = (data as ApiResponse<T> | null)?.message;
+        throw new Error(message || `HTTP ${res.status}`);
+      }
+      return data as ApiResponse<T>;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error(`Request timed out after ${timeout}ms`);

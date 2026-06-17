@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { apiClient } from '@/services/client';
 import { API_ENDPOINTS } from '@/services/constants';
 import { BaseUser, UserRole } from '@/types';
-import { adminService, AdminPayment, FeedbackTicket } from '@/services/admin';
+import { adminService, AdminPayment, FeedbackTicket, type AdminAnalytics } from '@/services/admin';
 import { Roadmap } from '@/types/roadmap';
 
 // Types
@@ -46,13 +46,7 @@ interface UseAdminReturn {
   addAdminResponse: (id: string, response: string) => Promise<void>;
   
   // Analytics
-  getAnalytics: () => Promise<{
-    totalUsers: number;
-    totalTrainers: number;
-    totalStudents: number;
-    totalRevenue: number;
-    pendingTrainers: number;
-  } | null>;
+  getAnalytics: () => Promise<AdminAnalytics | null>;
   
   // Roadmaps Management
   getRoadmaps: () => Promise<Roadmap[] | null>;
@@ -165,7 +159,7 @@ export function useAdmin(): UseAdminReturn {
   const getPaymentDetails = async (id: string): Promise<AdminPayment | null> => {
     try {
       setIsLoading(true);
-      // Use admin service for payments since it has proper mock data
+      // Load payment details from the admin payments API
       const paymentsRes = await adminService.getPayments();
       const payment = paymentsRes.data?.find(p => p._id === id);
       setError(null);
@@ -212,13 +206,7 @@ export function useAdmin(): UseAdminReturn {
   };
 
   // Analytics
-  const getAnalytics = async (): Promise<{
-    totalUsers: number;
-    totalTrainers: number;
-    totalStudents: number;
-    totalRevenue: number;
-    pendingTrainers: number;
-  } | null> => {
+  const getAnalytics = async (): Promise<AdminAnalytics | null> => {
     try {
       setIsLoading(true);
       const res = await adminService.getAnalytics();

@@ -1,33 +1,86 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { User, Mail, Shield, Bell, Calendar, MapPin, Edit2, Check, Phone, Globe, Briefcase, Award, ChevronRight, Settings, Star, Zap, Upload } from 'lucide-react';
+import { User, Mail, Shield, Bell, Calendar, Edit2, Check, Phone, Briefcase, Award, ChevronRight, Settings, Star, Upload, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts';
-import { UserRole } from '@/types';
-import { BASE_URL, userService } from '@/services';
+import { UserRole, Student } from '@/types';
+import { BASE_URL, userService, statsService, publicProfileService } from '@/services';
+import type { StudentStats } from '@/services/stats';
+import type { CertificateRecord } from '@/services/certificates';
 import Image from 'next/image';
+import { useNavigationWithLoading } from '@/lib/utils/navigation';
 
 export default function StudentProfilePage() {
     const { user, updateUserProfile } = useAuth();
+    const { navigate } = useNavigationWithLoading();
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [stats, setStats] = useState<StudentStats | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const [profileData, setProfileData] = useState({
-        name: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Student User',
-        email: user?.email || 'student@dreamize.rw',
-        phone: '+250 788 111 222',
-        location: 'Kigali, Rwanda',
-        bio: 'Dedicated student passionate about learning and growing in the tech field. Committed to mastering new skills and contributing to innovative projects.',
-        expertise: ['Web Development', 'Programming', 'Problem Solving', 'Team Collaboration'],
-        experience: '1+ Years',
-        field: 'Tech Field',
-        joinDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Sep 2024'
-    });
+    const student = user as Student | null;
 
-    const handleSave = () => {
-        setIsEditing(false);
+    const [profileData, setProfileData] = useState({
+        name: '',
+        email: '',
+        phone: '',
+        joinDate: '',
+        bio: '',
+    });
+    const [publicProfileUrl, setPublicProfileUrl] = useState('');
+
+    useEffect(() => {
+        if (!user) return;
+        setProfileData({
+            name: `${user.firstName} ${user.lastName}`.trim(),
+            email: user.email,
+            phone: user.phoneNumber || 'Not set',
+            joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—',
+            bio: (user as Student).bio || '',
+        });
+    }, [user]);
+
+    useEffect(() => {
+        if (!user?._id) return;
+        publicProfileService
+            .getStudentProfile(user._id)
+            .then((response) => {
+                if (response.success && response.data?.slug) {
+                    setPublicProfileUrl(publicProfileService.getPublicProfileUrl(response.data.slug));
+                }
+            })
+            .catch(() => undefined);
+    }, [user?._id]);
+
+    useEffect(() => {
+        statsService.getMyStats().then((response) => {
+            if (response.success && response.data) {
+                setStats(response.data as StudentStats);
+            }
+        }).catch(() => setStats(null));
+    }, []);
+
+    const handleSave = async () => {
+        setIsSaving(true);
+        try {
+            const nameParts = profileData.name.trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            await updateUserProfile({
+                firstName,
+                lastName,
+                email: profileData.email,
+                phoneNumber: profileData.phone === 'Not set' ? '' : profileData.phone,
+                bio: profileData.bio,
+            });
+            setIsEditing(false);
+        } catch (error) {
+            console.error('Error saving profile:', error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleProfilePictureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,9 +173,15 @@ export default function StudentProfilePage() {
                                             </div>
                                             <p className="text-slate-500 font-light flex items-center gap-2 mt-1.5">
                                                 <Briefcase className="w-4.5 h-4.5 text-slate-600" />
-                                                <span className="text-slate-600 capitalize">{profileData.field.replace(/-/g, ' ')} Field</span>
-                                                <span className="w-1 h-1 bg-slate-300 rounded-full" />
-                                                <span className="text-slate-400">Tech Trainee</span>
+                                                <span className="text-slate-600">
+                                                    {student?.hasActiveSubscription ? 'Premium Student' : 'Standard Student'}
+                                                </span>
+                                                {student?.isVerified && (
+                                                    <>
+                                                        <span className="w-1 h-1 bg-slate-300 rounded-full" />
+                                                        <span className="text-slate-400">Verified</span>
+                                                    </>
+                                                )}
                                             </p>
                                         </div>
 
@@ -137,9 +196,10 @@ export default function StudentProfilePage() {
                                                     </button>
                                                     <button
                                                         onClick={handleSave}
-                                                        className="px-8 py-3 bg-slate-900 text-white rounded-full font-semibold hover:bg-slate-800 shadow-xl shadow-slate-200 active:scale-95 transition-all"
+                                                        disabled={isSaving}
+                                                        className="px-8 py-3 bg-slate-900 text-white rounded-full font-semibold hover:bg-slate-800 shadow-xl shadow-slate-200 active:scale-95 transition-all disabled:opacity-60"
                                                     >
-                                                        Save Changes
+                                                        {isSaving ? 'Saving...' : 'Save Changes'}
                                                     </button>
                                                 </>
                                             ) : (
@@ -216,86 +276,55 @@ export default function StudentProfilePage() {
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Location</label>
-                                            {isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={profileData.location}
-                                                    onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
-                                                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all font-medium"
-                                                />
-                                            ) : (
-                                                <div className="px-5 py-3.5 bg-slate-50/50 border border-transparent rounded-xl flex items-center justify-between">
-                                                    <p className="text-slate-900 font-semibold">{profileData.location}</p>
-                                                    <MapPin className="w-4 h-4 text-slate-300" />
-                                                </div>
-                                            )}
-                                        </div>
                                     </div>
-                                    <div className="mt-10 pt-10 border-t border-slate-50">
-                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-4">Professional Bio</label>
+
+                                    <div className="space-y-2 mt-6">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Bio</label>
                                         {isEditing ? (
                                             <textarea
                                                 value={profileData.bio}
                                                 onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
                                                 rows={4}
-                                                className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all font-medium resize-none leading-relaxed"
+                                                placeholder="Tell visitors about your learning journey and goals..."
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all font-medium resize-none"
                                             />
                                         ) : (
-                                            <div className="p-6 bg-slate-50/50 rounded-xl border border-transparent">
-                                                <p className="text-slate-700 font-light leading-relaxed">{profileData.bio}</p>
+                                            <div className="px-5 py-3.5 bg-slate-50/50 border border-transparent rounded-xl">
+                                                <p className="text-slate-700 font-light leading-relaxed">
+                                                    {profileData.bio || 'Add a bio to appear on your public portfolio.'}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
+
+                                    {publicProfileUrl && (
+                                        <div className="mt-6 p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                                Public Portfolio
+                                            </p>
+                                            <a
+                                                href={publicProfileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline break-all"
+                                            >
+                                                {publicProfileUrl}
+                                                <ExternalLink className="w-4 h-4 shrink-0" />
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">
                                     <div className="flex items-center gap-4 mb-6">
                                         <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                                            <Award className="w-6 h-6" />
+                                            <Calendar className="w-6 h-6" />
                                         </div>
-                                        <h3 className="text-xl font-playfair font-semibold text-slate-900">Expertise & Experience</h3>
+                                        <h3 className="text-xl font-playfair font-semibold text-slate-900">Account</h3>
                                     </div>
-
-                                    <div className="space-y-8">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1 mb-4">Top Skills & Specialties</label>
-                                            <div className="flex flex-wrap gap-3">
-                                                {profileData.expertise.map((skill, i) => (
-                                                    <span key={i} className="px-4 py-2 bg-slate-50 text-slate-700 border border-slate-100 rounded-xl text-xs font-bold uppercase tracking-wider shadow-sm">
-                                                        {skill}
-                                                    </span>
-                                                ))}
-                                                {isEditing && (
-                                                    <button className="px-4 py-2 border-2 border-dashed border-slate-200 text-slate-400 rounded-xl text-xs font-bold uppercase tracking-wider hover:border-slate-500 hover:text-slate-500 transition-all active:scale-95">
-                                                        + Add Expertise
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-                                            <div className="flex items-center gap-6 p-6 bg-slate-50/30 rounded-[32px] border border-slate-100/50 group hover:bg-slate-50 transition-colors">
-                                                <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-slate-600 shadow-sm transform group-hover:scale-110 transition-transform duration-500">
-                                                    <Zap className="w-7 h-7" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-800/60 uppercase tracking-wider mb-1">Experience</p>
-                                                    <p className="text-lg font-playfair font-semibold text-slate-900">{profileData.experience}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-6 p-6 bg-slate-50/30 rounded-[32px] border border-slate-100/50 group hover:bg-slate-50 transition-colors">
-                                                <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-slate-600 shadow-sm transform group-hover:scale-110 transition-transform duration-500">
-                                                    <Calendar className="w-7 h-7" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs font-bold text-slate-800/60 uppercase tracking-wider mb-1">Active Since</p>
-                                                    <p className="text-lg font-playfair font-semibold text-slate-900">{profileData.joinDate}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <p className="text-sm text-slate-500 font-light">
+                                        Member since {profileData.joinDate}
+                                    </p>
                                 </div>
                             </div>
 
@@ -304,18 +333,22 @@ export default function StudentProfilePage() {
                                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/30 p-8">
                                     <h3 className="text-xl font-playfair font-semibold text-slate-900 mb-8 flex items-center gap-3">
                                         <Star className="w-5 h-5 text-slate-500" />
-                                        Performance Stats
+                                        Learning Stats
                                     </h3>
                                     <div className="space-y-4">
                                         <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white hover:shadow-lg transition-all">
-                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Courses</span>
-                                            <span className="text-2xl font-playfair font-semibold text-slate-900">12</span>
+                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Active Roadmaps</span>
+                                            <span className="text-2xl font-playfair font-semibold text-slate-900">
+                                                {stats?.activeRoadmaps ?? 0}
+                                            </span>
                                         </div>
                                         <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white hover:shadow-lg transition-all border-l-4 border-l-primary">
-                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Progress</span>
+                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Milestone Progress</span>
                                             <div className="flex items-center gap-2">
                                                 <Star className="w-4 h-4 text-primary fill-primary" />
-                                                <span className="text-2xl font-playfair font-semibold text-slate-900">85%</span>
+                                                <span className="text-2xl font-playfair font-semibold text-slate-900">
+                                                    {stats?.roadmapProgress ?? 0}%
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -324,29 +357,31 @@ export default function StudentProfilePage() {
                                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-xl shadow-slate-200/30 p-8">
                                     <h3 className="text-xl font-playfair font-semibold text-slate-900 mb-8 flex items-center gap-3">
                                         <Settings className="w-5 h-5 text-slate-400" />
-                                        Student Hub
+                                        Quick Links
                                     </h3>
                                     <div className="space-y-3">
-                                        <SettingsItem icon={<Shield className="w-4.5 h-4.5" />} label="Security Settings" color="slate" />
-                                        <SettingsItem icon={<Bell className="w-4.5 h-4.5" />} label="Notifications" color="slate" />
-                                        <SettingsItem icon={<Globe className="w-4.5 h-4.5" />} label="Learning Settings" color="slate" />
+                                        <SettingsItem icon={<Shield className="w-4.5 h-4.5" />} label="Security Settings" onClick={() => navigate('/dashboard/student/settings')} />
+                                        <SettingsItem icon={<Bell className="w-4.5 h-4.5" />} label="Notifications" onClick={() => navigate('/dashboard/student/settings')} />
+                                        <SettingsItem icon={<Award className="w-4.5 h-4.5" />} label="My Certificates" onClick={() => navigate('/dashboard/student/certificates')} />
                                     </div>
                                 </div>
 
+                                {student?.isVerified && (
                                 <div className="bg-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden group">
                                     <div className="relative z-10 text-center">
                                         <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-[10px] font-bold uppercase tracking-wider mb-4">
                                             <Shield className="w-3 h-3" />
-                                            Identity Verified
+                                            Email Verified
                                         </div>
-                                        <h3 className="text-xl font-playfair font-semibold mb-2">Student Badge</h3>
-                                        <p className="text-slate-400 text-xs font-medium mb-6 leading-relaxed">Your student credentials have been fully verified by the Academy board.</p>
+                                        <h3 className="text-xl font-playfair font-semibold mb-2">Student Account</h3>
+                                        <p className="text-slate-400 text-xs font-medium mb-6 leading-relaxed">Your email has been verified and your account is active.</p>
                                         <div className="w-16 h-16 bg-gradient-to-br from-slate-400 to-slate-600 rounded-xl mx-auto flex items-center justify-center shadow-lg shadow-slate-600/20 transform group-hover:rotate-12 transition-transform duration-500">
                                             <Check className="w-8 h-8 text-white" />
                                         </div>
                                     </div>
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-600/10 rounded-full -mr-16 -mt-16 blur-3xl opacity-50" />
                                 </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -356,17 +391,11 @@ export default function StudentProfilePage() {
     );
 }
 
-function SettingsItem({ icon, label, color }: { icon: React.ReactNode, label: string, color: string }) {
-    const colors = {
-        gray: 'bg-gray-50 text-gray-600 group-hover:bg-yellow-600',
-    };
-
-    const colorClasses = colors[color as keyof typeof colors] || colors.gray;
-
+function SettingsItem({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
     return (
-        <button className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100 group">
+        <button onClick={onClick} className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100 group">
             <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:text-white transition-all duration-300 ${colorClasses}`}>
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-50 text-gray-600 group-hover:bg-yellow-600 group-hover:text-white transition-all duration-300">
                     {icon}
                 </div>
                 <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">{label}</span>

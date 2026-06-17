@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useBooking } from '@/contexts/BookingContext';
-import { useUsers } from '@/contexts';
-import { BookingStatus, TrainerApprovalRequest } from '@/types/booking';
+import { BookingStatus, TrainerApprovalRequest, Booking } from '@/types/booking';
 import { UserRole } from '@/types/user';
 import { Calendar, Clock, User, MessageSquare, CheckCircle, XCircle, AlertCircle, Filter, Search, RefreshCw, Video, MapPin, FileText } from 'lucide-react';
 
@@ -18,7 +17,6 @@ export default function TrainerBookingsPage() {
     rejectBooking, 
     refreshBookings 
   } = useBooking();
-  const { students } = useUsers();
   
   const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,15 +37,10 @@ export default function TrainerBookingsPage() {
     nextSteps: ''
   });
 
-  const getStudentName = (studentId: string) => {
-    const student = students.find(s => s._id === studentId);
-    return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
-  };
+  const getStudentName = (student: Booking['student']) =>
+    `${student.firstName} ${student.lastName}`.trim() || 'Unknown Student';
 
-  const getStudentEmail = (studentId: string) => {
-    const student = students.find(s => s._id === studentId);
-    return student?.email || 'unknown@example.com';
-  };
+  const getStudentEmail = (student: Booking['student']) => student.email || 'unknown@example.com';
 
   const handleApprove = async (bookingId: string) => {
     setApprovingBooking(bookingId);
@@ -62,8 +55,18 @@ export default function TrainerBookingsPage() {
     setShowApproveModal(true);
   };
 
+  const canApproveOnline =
+    approvalData.approvalNotes.trim().length > 0 &&
+    approvalData.sessionDuration > 0;
+
+  const canApproveInPerson =
+    canApproveOnline && (approvalData.sessionLocation?.trim().length ?? 0) > 0;
+
+  const canConfirmApprove =
+    approvalData.sessionFormat === 'online' ? canApproveOnline : canApproveInPerson;
+
   const handleConfirmApprove = async () => {
-    if (!approvingBooking || !approvalData.approvalNotes.trim() || !approvalData.sessionLocation.trim()) return;
+    if (!approvingBooking || !canConfirmApprove) return;
     
     try {
       await approveBooking(approvingBooking, approvalData);
@@ -113,8 +116,8 @@ export default function TrainerBookingsPage() {
   };
 
   const filteredBookings = (activeTab === 'pending' ? trainerPendingBookings : trainerAllBookings).filter(booking => {
-    const matchesSearch = getStudentName(booking.student._id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         getStudentEmail(booking.student._id).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = getStudentName(booking.student).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         getStudentEmail(booking.student).toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -287,8 +290,8 @@ export default function TrainerBookingsPage() {
                           <User className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-slate-900">{getStudentName(booking.student._id)}</h3>
-                          <p className="text-sm text-slate-500">{getStudentEmail(booking.student._id)}</p>
+                          <h3 className="font-medium text-slate-900">{getStudentName(booking.student)}</h3>
+                          <p className="text-sm text-slate-500">{getStudentEmail(booking.student)}</p>
                         </div>
                       </div>
 
@@ -355,7 +358,8 @@ export default function TrainerBookingsPage() {
                             <div className="flex items-center gap-2">
                               <MapPin className="w-4 h-4 text-slate-400" />
                               <span className="text-sm text-slate-600">
-                                Location: {booking.sessionLocation}
+                                {booking.sessionFormat === 'online' ? 'Zoom: ' : 'Location: '}
+                                {booking.sessionLocation}
                               </span>
                             </div>
                           </div>
@@ -513,18 +517,25 @@ export default function TrainerBookingsPage() {
               </div>
 
               {/* Session Location */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  {approvalData.sessionFormat === 'online' ? 'Meeting Link' : 'Location'}
-                </label>
-                <input
-                  type="text"
-                  value={approvalData.sessionLocation}
-                  onChange={(e) => setApprovalData({...approvalData, sessionLocation: e.target.value})}
-                  placeholder={approvalData.sessionFormat === 'online' ? 'https://zoom.us/j/...' : 'Enter physical address'}
-                  className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none"
-                />
-              </div>
+              {approvalData.sessionFormat === 'in-person' ? (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Location</label>
+                  <input
+                    type="text"
+                    value={approvalData.sessionLocation}
+                    onChange={(e) => setApprovalData({ ...approvalData, sessionLocation: e.target.value })}
+                    placeholder="Enter physical address"
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3">
+                  <p className="text-sm font-medium text-slate-900 mb-1">Zoom meeting link</p>
+                  <p className="text-sm text-slate-600 font-light">
+                    A unique Zoom link will be created automatically when you approve. Student and trainer both receive it by email.
+                  </p>
+                </div>
+              )}
 
               {/* Approval Notes */}
               <div>
@@ -572,7 +583,7 @@ export default function TrainerBookingsPage() {
               </button>
               <button
                 onClick={handleConfirmApprove}
-                disabled={!approvalData.approvalNotes.trim() || !approvalData.sessionLocation.trim()}
+                disabled={!canConfirmApprove}
                 className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Approve Booking

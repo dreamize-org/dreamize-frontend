@@ -1,19 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProjects } from '@/contexts/ProjectContext';
 import { useRouter } from '@/hooks/useRouter';
 import { Student, UserRole } from '@/types';
 import Sidebar from '@/components/dashboard/Sidebar';
 import {
-  Download,
-  Share2,
   Lock as LockIcon,
   Code,
   Palette,
   Briefcase,
-  Award,
   Calendar,
   ExternalLink,
   FileText,
@@ -24,7 +20,6 @@ export default function PortfolioPage() {
   const { user, isAuthenticated } = useAuth();
   const { projects, isLoading } = useProjects();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'projects' | 'achievements'>('projects');
 
   // Cast user to Student to access subscription status
   const student = user as Student;
@@ -103,49 +98,14 @@ export default function PortfolioPage() {
           <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-playfair font-semibold text-slate-900">My Portfolio</h1>
-                  <p className="text-slate-500 font-light mt-1">Showcase your work and achievements</p>
-                </div>
-                <div className="flex gap-3">
-                  <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50 transition-colors">
-                    <Download className="w-4 h-4" />
-                    Export
-                  </button>
-                  <button className="flex items-center gap-2 px-4 py-2 border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50 transition-colors">
-                    <Share2 className="w-4 h-4" />
-                    Share
-                  </button>
-                </div>
+              <div>
+                <h1 className="text-3xl font-playfair font-semibold text-slate-900">My Portfolio</h1>
+                <p className="text-slate-500 font-light mt-1">Showcase your approved projects</p>
               </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="flex gap-1 mb-8 bg-slate-100 rounded-full p-1 max-w-xs">
-              <button
-                onClick={() => setActiveTab('projects')}
-                className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'projects'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                  }`}
-              >
-                Projects
-              </button>
-              <button
-                onClick={() => setActiveTab('achievements')}
-                className={`flex-1 px-4 py-2 rounded-full text-sm font-medium transition-all ${activeTab === 'achievements'
-                    ? 'bg-white text-slate-900 shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                  }`}
-              >
-                Achievements
-              </button>
-            </div>
-
             {/* Content */}
-            {activeTab === 'projects' ? (
-              <div>
+            <div>
                 {isLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {[...Array(6)].map((_, i) => (
@@ -237,18 +197,7 @@ export default function PortfolioPage() {
                     ))}
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Award className="w-8 h-8 text-slate-400" />
-                </div>
-                <h3 className="text-lg font-playfair font-semibold text-slate-900 mb-2">Achievements Coming Soon</h3>
-                <p className="text-slate-500 font-light">
-                  Track your milestones and certifications here.
-                </p>
-              </div>
-            )}
+            </div>
           </div>
         </main>
       </div>

@@ -36,6 +36,11 @@ class BookingService {
         return response;
     }
 
+    async cancelBooking(bookingId: string): Promise<ApiResponse<Booking>> {
+        const response = await apiClient.post<Booking>(`${API_ENDPOINTS.BOOKING}/${bookingId}/cancel`, {});
+        return response;
+    }
+
 
 }
 

@@ -22,7 +22,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await projectService.getAllProjects  ();
+      const response = await projectService.getAllProjects();
       setProjects(response.data || []);
     } catch {
       setError('Failed to load projects');

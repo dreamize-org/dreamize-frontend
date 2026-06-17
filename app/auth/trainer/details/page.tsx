@@ -61,10 +61,11 @@ export default function TrainerDetailsPage() {
     }));
   };
 
-  const { registerTrainer, isLoading } = useAuth();
+  const { registerTrainer, isLoading, error, clearError } = useAuth();
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearError();
     const newErrors = {
       dateOfBirth: '',
       gender: '',
@@ -126,19 +127,8 @@ export default function TrainerDetailsPage() {
       };
 
       await registerTrainer(trainerData);
-
-    } catch (error) {
-      console.error('Registration failed:', error);
-    } finally {
-      setErrors({
-        dateOfBirth: '',
-        gender: '',
-        cvUrl: '',
-        introVideoUrl: '',
-        yearsOfExperience: '',
-        specializations: '',
-        skills: '',
-      })
+    } catch (registrationError) {
+      console.error('Registration failed:', registrationError);
     }
   };
 
@@ -293,6 +283,12 @@ export default function TrainerDetailsPage() {
               </div>
             </div>
           </div>
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+              <p className="text-[14px] text-red-600 text-center font-medium">{error}</p>
+            </div>
+          )}
 
           <div className="pt-4">
             <PremiumButton

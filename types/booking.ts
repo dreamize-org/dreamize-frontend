@@ -18,7 +18,7 @@ export interface TrainerApprovalRequest {
   approvalNotes: string;
   sessionDuration: number; // in minutes
   sessionFormat: 'online' | 'in-person';
-  sessionLocation: string; // URL or physical address
+  sessionLocation?: string; // optional for online — Zoom link is auto-generated on the backend
   preparationRequirements: string;
   nextSteps: string;
 }

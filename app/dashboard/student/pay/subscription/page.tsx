@@ -14,7 +14,6 @@ export default function SubscriptionPaymentPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const { paySubscriptionPayment } = usePayment();
   const [formData, setFormData] = useState({
-    phone: '',
     promoCode: ''
   });
 
@@ -134,23 +133,11 @@ export default function SubscriptionPaymentPage() {
                         {/* Payment Form */}
                         <form onSubmit={handleSubmit} className="space-y-4">
                           <h3 className="text-lg font-playfair font-semibold text-slate-900">Payment Details</h3>
-                          
-                          {/* Phone Number */}
-                          <div>
-                            <label htmlFor="phone" className="block text-sm font-medium text-slate-700 mb-2">
-                              Mobile Money Phone Number *
-                            </label>
-                            <input
-                              type="tel"
-                              id="phone"
-                              value={formData.phone}
-                              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                              placeholder="+250 7XX-XXX-XXX"
-                              className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all"
-                              required
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                              Enter your MTN/Airtel Money phone number
+
+                          <div className="flex items-start gap-2 p-4 bg-amber-50 border border-amber-100 rounded-xl">
+                            <AlertCircle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                            <p className="text-xs text-amber-800 leading-relaxed">
+                              Payment is recorded on your Dreamize account after you confirm below. Mobile Money gateway integration is planned for a later release.
                             </p>
                           </div>
 
@@ -178,18 +165,10 @@ export default function SubscriptionPaymentPage() {
                             </div>
                           </div>
 
-                          {/* Security Notice */}
-                          <div className="flex items-start gap-2 p-3 bg-slate-50 rounded-xl">
-                            <Shield className="w-4 h-4 text-slate-500 mt-0.5" />
-                            <p className="text-xs text-slate-600">
-                              Your payment is secured with MTN/Airtel Money. You'll receive a confirmation prompt on your phone.
-                            </p>
-                          </div>
-
                           {/* Submit Button */}
                           <button
                             type="submit"
-                            disabled={isProcessing || !formData.phone}
+                            disabled={isProcessing}
                             className="w-full bg-slate-900 text-white py-3 rounded-full font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                           >
                             <CreditCard className="w-5 h-5" />
@@ -268,7 +247,7 @@ export default function SubscriptionPaymentPage() {
                       <p className="text-slate-500 mb-4">Please wait while we process your payment...</p>
                       <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 max-w-md mx-auto">
                         <p className="text-sm text-primary">
-                          Check your phone ({formData.phone}) for the payment confirmation prompt
+                          Recording your subscription payment on Dreamize...
                         </p>
                       </div>
                     </div>
