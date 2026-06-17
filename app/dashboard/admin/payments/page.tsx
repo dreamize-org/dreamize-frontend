@@ -5,6 +5,7 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import { DollarSign, XCircle, Clock, Search, Filter, Download, CreditCard, RefreshCw, TrendingUp, Wallet, ArrowUpRight } from 'lucide-react';
 import { UserRole, type Payment, PaymentType } from '@/types';
 import { apiClient } from '@/services/client';
+import { API_ENDPOINTS } from '@/services/constants';
 
 export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -20,7 +21,7 @@ export default function PaymentsPage() {
   const fetchPayments = async () => {
     setIsLoading(true);
     try {
-      const response = await apiClient.get<Payment[]>('/api/admin/payments');
+      const response = await apiClient.get<Payment[]>(API_ENDPOINTS.ADMIN_PAYMENTS);
       if (response.success) {
         setPayments(response.data ?? []);
       }
@@ -54,7 +55,7 @@ export default function PaymentsPage() {
 
   const handleConfirmPayment = async (id: string) => {
     try {
-      const response = await apiClient.post<Payment>(`/api/admin/payments/${id}/confirm`, {});
+      const response = await apiClient.post<Payment>(`${API_ENDPOINTS.ADMIN_PAYMENTS}/${id}/confirm`, {});
       if (response.success) {
         await fetchPayments();
       }

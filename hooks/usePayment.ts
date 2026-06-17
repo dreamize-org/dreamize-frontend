@@ -11,10 +11,15 @@ export function usePayment() {
         setIsLoading(true);
         setError(null);
         try {
-            await paymentService.payOriantaionPayment({ promocode });
+            const response = await paymentService.payOriantaionPayment({ promocode });
+            if (!response.success) {
+                throw new Error(response.message || 'Payment processing failed');
+            }
             await fetchOnboardingChecklist();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Payment processing failed');
+            const message = err instanceof Error ? err.message : 'Payment processing failed';
+            setError(message);
+            throw err;
         } finally {
             setIsLoading(false);
         }
@@ -24,10 +29,15 @@ export function usePayment() {
         setIsLoading(true);
         setError(null);
         try {
-            await paymentService.paySubscriptionPayment({ promocode });
+            const response = await paymentService.paySubscriptionPayment({ promocode });
+            if (!response.success) {
+                throw new Error(response.message || 'Payment processing failed');
+            }
             await fetchOnboardingChecklist();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Payment processing failed');
+            const message = err instanceof Error ? err.message : 'Payment processing failed';
+            setError(message);
+            throw err;
         } finally {
             setIsLoading(false);
         }

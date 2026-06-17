@@ -159,7 +159,7 @@ export function useAdmin(): UseAdminReturn {
   const getPaymentDetails = async (id: string): Promise<AdminPayment | null> => {
     try {
       setIsLoading(true);
-      // Use admin service for payments since it has proper mock data
+      // Load payment details from the admin payments API
       const paymentsRes = await adminService.getPayments();
       const payment = paymentsRes.data?.find(p => p._id === id);
       setError(null);

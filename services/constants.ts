@@ -67,6 +67,7 @@ export const API_ENDPOINTS = {
   TRAINER_SLOTS: (id: string) => `/api/trainers/${id}/slots`,
 
   ADMIN_ANALYTICS: '/api/admin/analytics',
+  ADMIN_PAYMENTS: '/api/admin/payments',
   ADMIN_CERTIFICATES: '/api/admin/certificates',
   ADMIN_FEEDBACK: '/api/admin/feedback',
   ADMIN_APPROVE_TRAINER: (id: string) => `/api/admin/trainers/${id}/approve`,
