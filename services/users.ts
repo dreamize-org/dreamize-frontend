@@ -32,6 +32,10 @@ class UserService {
     return apiClient.get<Student[]>(API_ENDPOINTS.USERS_STUDENTS);
   }
 
+  async getMyStudents(): Promise<ApiResponse<Student[]>> {
+    return apiClient.get<Student[]>(API_ENDPOINTS.TRAINER_MY_STUDENTS);
+  }
+
   async updateUserStatus(id: string, status: 'active' | 'inactive' | 'suspended'): Promise<ApiResponse<BaseUser>> {
     return apiClient.put<BaseUser>(API_ENDPOINTS.USER_STATUS(id), { status });
   }

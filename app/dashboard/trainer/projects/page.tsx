@@ -6,6 +6,8 @@ import { useProjects } from '@/contexts/ProjectContext';
 import { useUsers } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { projectService } from '@/services/project';
+import { getAuthUserId, normalizeId } from '@/lib/auth/session';
+import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { UserRole, ProjectStatus, type Project } from '@/types';
 import { 
   Folder, 
@@ -44,9 +46,9 @@ export default function TrainerProjectsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Filter projects for trainer's students
-  const trainerStudentIds = students
-    .filter(s => s.assignedTrainerId === user?._id)
-    .map(s => s._id);
+  const trainerStudentIds = filterStudentsForTrainer(students, getAuthUserId(user)).map((student) =>
+    normalizeId(student._id)
+  );
   
   const trainerProjects = projects.filter(p => trainerStudentIds.includes(p.student._id));
 

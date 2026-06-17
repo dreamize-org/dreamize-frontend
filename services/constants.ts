@@ -64,6 +64,7 @@ export const API_ENDPOINTS = {
   SYSTEM_MEMORY: '/api/system/memory',
   TRAINERS_PENDING: '/api/trainers/pending',
   TRAINER_MY_AVAILABILITY: '/api/trainers/me/availability',
+  TRAINER_MY_STUDENTS: '/api/trainers/me/students',
   TRAINER_SLOTS: (id: string) => `/api/trainers/${id}/slots`,
 
   ADMIN_ANALYTICS: '/api/admin/analytics',

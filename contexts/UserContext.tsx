@@ -30,6 +30,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
+      if (userRole === UserRole.TRAINER) {
+        const [studentResponse, trainerResponse] = await Promise.all([
+          userService.getMyStudents(),
+          userService.getTrainers(),
+        ]);
+        const studentsData = studentResponse.data || [];
+        const trainersData = trainerResponse.data || [];
+        setTrainers(trainersData);
+        setStudents(studentsData);
+        setUsers([...studentsData, ...trainersData]);
+        return;
+      }
+
       const studentResponse = await userService.getStudents();
       const trainerResponse = await userService.getTrainers();
       const studentsData = studentResponse.data || [];

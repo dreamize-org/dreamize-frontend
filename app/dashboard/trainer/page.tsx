@@ -6,6 +6,8 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useRoadmaps, useUsers, useFinancial } from '@/contexts';
 import { useBooking } from '@/contexts/BookingContext';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { getAuthUserId } from '@/lib/auth/session';
+import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { BookingStatus } from '@/types/booking';
 import { 
   Users, 
@@ -76,9 +78,7 @@ export default function TrainerDashboard() {
   }
 
   // Get trainer-specific data
-  const trainerStudents = students.filter(
-    (student) => student.assignedTrainerId === user._id
-  );
+  const trainerStudents = filterStudentsForTrainer(students, getAuthUserId(user));
 
   const trainerRoadmaps = studentRoadmaps.filter(r => r.trainer._id === user._id);
   const activeRoadmaps = trainerRoadmaps.filter(r => r.status === 'active');

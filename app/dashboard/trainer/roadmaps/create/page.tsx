@@ -3,9 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from '@/hooks/useRouter';;
 import { useAuth, useUsers, useRoadmaps } from '@/contexts';
+import { getAuthUserId } from '@/lib/auth/session';
+import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { Student, UserRole } from '@/types';
 import { CreateRoadmapData, Milestone, RoadmapStepStatus } from '@/types/roadmap';
 import Sidebar from '@/components/dashboard/Sidebar';
+import { CommaSeparatedInput } from '@/components/ui/CommaSeparatedInput';
 import {
   Map, Search, User, Plus, X, ChevronLeft, CheckCircle,
   Clock, Target, ArrowRight, Loader2
@@ -28,7 +31,7 @@ export default function CreateRoadmapPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Filter students assigned to this trainer
-  const assignedStudents = students.filter(s => s.assignedTrainerId === user?._id);
+  const assignedStudents = filterStudentsForTrainer(students, getAuthUserId(user));
 
   // Filter by search query
   const filteredStudents = assignedStudents.filter(student => {
@@ -370,14 +373,11 @@ export default function CreateRoadmapPage() {
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                   Skills to Learn
                                 </label>
-                                <input
-                                  type="text"
-                                  value={milestone.skillsToLearn?.join(', ') || ''}
-                                  onChange={(e) => handleUpdateMilestone(
-                                    index,
-                                    'skillsToLearn',
-                                    e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                                  )}
+                                <CommaSeparatedInput
+                                  value={milestone.skillsToLearn || []}
+                                  onChange={(skillsToLearn) =>
+                                    handleUpdateMilestone(index, 'skillsToLearn', skillsToLearn)
+                                  }
                                   placeholder="React, JavaScript, CSS..."
                                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
                                 />
@@ -411,14 +411,11 @@ export default function CreateRoadmapPage() {
                               <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Required Projects
                               </label>
-                              <input
-                                type="text"
-                                value={milestone.requiredProjects?.join(', ') || ''}
-                                onChange={(e) => handleUpdateMilestone(
-                                  index,
-                                  'requiredProjects',
-                                  e.target.value.split(',').map(s => s.trim()).filter(Boolean)
-                                )}
+                              <CommaSeparatedInput
+                                value={milestone.requiredProjects || []}
+                                onChange={(requiredProjects) =>
+                                  handleUpdateMilestone(index, 'requiredProjects', requiredProjects)
+                                }
                                 placeholder="E-commerce site, Portfolio website..."
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
                               />

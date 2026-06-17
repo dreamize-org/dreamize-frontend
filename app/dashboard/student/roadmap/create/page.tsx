@@ -13,6 +13,7 @@ import {
   Plus, Trash2, Sparkles, ArrowRight, Loader2, ChevronLeft, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TagListInput } from '@/components/ui/TagListInput';
 
 function CreatePageContent() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
@@ -513,46 +514,16 @@ function CreatePageContent() {
                             )}
 
                             {/* Add Tool Input */}
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                id="toolInput"
-                                placeholder="e.g., Python, React Native, Figma, OpenCV"
-                                className="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all text-sm outline-none"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const input = e.target as HTMLInputElement;
-                                    const value = input.value.trim();
-                                    if (value && !projectSubmission.toolsUsed.includes(value)) {
-                                      setProjectSubmission({
-                                        ...projectSubmission,
-                                        toolsUsed: [...projectSubmission.toolsUsed, value]
-                                      });
-                                      input.value = '';
-                                    }
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const input = document.getElementById('toolInput') as HTMLInputElement;
-                                  const value = input.value.trim();
-                                  if (value && !projectSubmission.toolsUsed.includes(value)) {
-                                    setProjectSubmission({
-                                      ...projectSubmission,
-                                      toolsUsed: [...projectSubmission.toolsUsed, value]
-                                    });
-                                    input.value = '';
-                                  }
-                                }}
-                                className="px-5 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium flex items-center justify-center flex-shrink-0"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <p className="text-[10px] text-slate-400">Press Enter or click + to add a tool tag.</p>
+                            <TagListInput
+                              id="toolInput"
+                              tags={projectSubmission.toolsUsed}
+                              onChange={(toolsUsed) =>
+                                setProjectSubmission({ ...projectSubmission, toolsUsed })
+                              }
+                              placeholder="e.g., Python, React Native, Figma, OpenCV"
+                              inputClassName="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all text-sm outline-none"
+                              buttonClassName="px-5 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium flex items-center justify-center flex-shrink-0"
+                            />
                           </div>
                         </div>
 
