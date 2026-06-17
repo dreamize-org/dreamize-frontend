@@ -9,6 +9,7 @@ export interface ChatContactEntry {
     lastName: string;
     avatar?: string;
     role: string;
+    profilePicture?: string;
   };
   lastMessage: {
     _id: string;
@@ -19,6 +20,7 @@ export interface ChatContactEntry {
     isRead: boolean;
   } | null;
   lastMessageAt: string | null;
+  unreadCount?: number;
 }
 
 export interface ChatMessage {
@@ -37,6 +39,18 @@ class MessageService {
 
   async getMessages(contactId: string): Promise<ApiResponse<ChatMessage[]>> {
     return apiClient.get<ChatMessage[]>(API_ENDPOINTS.CHAT_MESSAGES(contactId));
+  }
+
+  async sendMessage(recipientId: string, text: string): Promise<ApiResponse<ChatMessage>> {
+    return apiClient.post<ChatMessage>(API_ENDPOINTS.CHAT_SEND_MESSAGE, { recipientId, text });
+  }
+
+  async markAsRead(contactId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiClient.put<{ success: boolean }>(API_ENDPOINTS.CHAT_MARK_READ(contactId));
+  }
+
+  async getUnreadCount(): Promise<ApiResponse<{ count: number }>> {
+    return apiClient.get<{ count: number }>(API_ENDPOINTS.CHAT_UNREAD_COUNT);
   }
 }
 
