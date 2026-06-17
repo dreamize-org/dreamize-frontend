@@ -2,15 +2,25 @@ import { apiClient } from './client';
 import { API_ENDPOINTS } from './constants';
 import type { ApiResponse } from '@/types';
 
+export type NotificationCategory =
+  | 'booking'
+  | 'project'
+  | 'certificate'
+  | 'roadmap'
+  | 'system';
+
 export interface Notification {
   _id: string;
   userId: string;
-  type: 'roadmap-submitted' | 'roadmap-approved' | 'roadmap-rejected' | 'session-scheduled' | 'payment-completed';
   title: string;
   message: string;
+  category: NotificationCategory;
   isRead: boolean;
-  relatedId?: string;
+  readAt: string | null;
+  actionUrl: string | null;
+  relatedEntityId: string | null;
   createdAt: string;
+  updatedAt?: string;
 }
 
 class NotificationService {
@@ -18,8 +28,16 @@ class NotificationService {
     return apiClient.get<Notification[]>(API_ENDPOINTS.NOTIFICATIONS);
   }
 
+  async getUnreadCount(): Promise<ApiResponse<{ count: number }>> {
+    return apiClient.get<{ count: number }>(API_ENDPOINTS.NOTIFICATIONS_UNREAD_COUNT);
+  }
+
   async markAsRead(id: string): Promise<ApiResponse<Notification>> {
-    return apiClient.put<Notification>(API_ENDPOINTS.NOTIFICATION_BY_ID(id));
+    return apiClient.patch<Notification>(API_ENDPOINTS.NOTIFICATION_READ(id));
+  }
+
+  async markAllAsRead(): Promise<ApiResponse<{ message: string }>> {
+    return apiClient.patch<{ message: string }>(API_ENDPOINTS.NOTIFICATIONS_READ_ALL);
   }
 }
 

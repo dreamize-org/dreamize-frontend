@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Home, Calendar, CalendarCheck, CreditCard, MessageSquare, X, Settings, Menu, User, LogOut, Lock, Users, Award, BookOpen, Ticket, Server, UserCheck } from 'lucide-react';
+import { Home, Calendar, CalendarCheck, CreditCard, MessageSquare, X, Settings, Menu, User, LogOut, Lock, Users, Award, BookOpen, Ticket, Server, UserCheck, Bell } from 'lucide-react';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { useAuth } from '@/contexts';
 import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
+import { useNotificationUnreadCount } from '@/hooks/useNotificationUnreadCount';
 import { SidebarProps, SidebarItem } from '@/types';
 import { Logo } from '../ui/Logo';
 import { BASE_URL } from '@/services';
@@ -15,6 +16,7 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
   const { navigate } = useNavigationWithLoading();
   const { user, logout } = useAuth();
   const { unreadCount: chatUnreadCount } = useChatUnreadCount();
+  const { unreadCount: notificationUnreadCount } = useNotificationUnreadCount();
 
   const currentUserType = user?.role || userType || 'student';
   const userName = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'User';
@@ -44,6 +46,7 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
           { icon: <BookOpen className="w-5 h-5" />, label: 'Roadmaps', href: '/dashboard/trainer/roadmaps' },
           { icon: <Award className="w-5 h-5" />, label: 'Projects', href: '/dashboard/trainer/projects' },
           { icon: <CalendarCheck className="w-5 h-5" />, label: 'Bookings', href: '/dashboard/trainer/bookings' },
+          { icon: <Bell className="w-5 h-5" />, label: 'Notifications', href: '/dashboard/trainer/notifications' },
           { icon: <MessageSquare className="w-5 h-5" />, label: 'Chat', href: '/dashboard/trainer/chat' },
           { icon: <User className="w-5 h-5" />, label: 'Profile', href: '/dashboard/trainer/profile' },
         ];
@@ -70,6 +73,7 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
           { icon: <Home className="w-5 h-5" />, label: 'Home', href: '/dashboard/student', active: true },
           { icon: <BookOpen className="w-5 h-5" />, label: 'My Roadmap', href: '/dashboard/student/roadmap' },
           { icon: <Award className="w-5 h-5" />, label: 'Projects', href: '/dashboard/student/projects' },
+          { icon: <Bell className="w-5 h-5" />, label: 'Notifications', href: '/dashboard/student/notifications' },
           { icon: <MessageSquare className="w-5 h-5" />, label: 'Chat', href: '/dashboard/student/chat' },
           { icon: <Calendar className="w-5 h-5" />, label: 'Calendar', href: '/dashboard/student/calendar' },
           { icon: <Award className="w-5 h-5" />, label: 'Portfolio', href: '/dashboard/student/portfolio' },
@@ -122,13 +126,20 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {sidebarItems.map((item) => {
             const isChatItem = item.label === 'Chat';
+            const isNotificationItem = item.label === 'Notifications';
             const chatBadge =
               isChatItem && chatUnreadCount > 0
                 ? chatUnreadCount > 99
                   ? '99+'
                   : String(chatUnreadCount)
                 : undefined;
-            const badge = chatBadge ?? item.badge;
+            const notificationBadge =
+              isNotificationItem && notificationUnreadCount > 0
+                ? notificationUnreadCount > 99
+                  ? '99+'
+                  : String(notificationUnreadCount)
+                : undefined;
+            const badge = chatBadge ?? notificationBadge ?? item.badge;
 
             return (
             <div key={item.label} className="relative group">
