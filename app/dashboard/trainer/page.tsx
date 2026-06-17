@@ -4,7 +4,9 @@ import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useRoadmaps, useUsers, useFinancial } from '@/contexts';
+import { useBooking } from '@/contexts/BookingContext';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { BookingStatus } from '@/types/booking';
 import { 
   Users, 
   CalendarCheck, 
@@ -28,7 +30,8 @@ export default function TrainerDashboard() {
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const { studentRoadmaps, isLoading: roadmapsLoading } = useRoadmaps();
   const { students, isLoading: usersLoading } = useUsers();
-  const { userWallet, isLoading: financialLoading } = useFinancial();
+  const { isLoading: financialLoading } = useFinancial();
+  const { trainerAllBookings, trainerPendingBookings } = useBooking();
   const { navigate } = useNavigationWithLoading();
 
   // Redirect if not authenticated or not a trainer
@@ -73,8 +76,8 @@ export default function TrainerDashboard() {
   }
 
   // Get trainer-specific data
-  const trainerStudents = students.filter(student =>
-    studentRoadmaps.some(r => r.trainer._id === user._id && r.student._id === student._id)
+  const trainerStudents = students.filter(
+    (student) => student.assignedTrainerId === user._id
   );
 
   const trainerRoadmaps = studentRoadmaps.filter(r => r.trainer._id === user._id);
@@ -108,9 +111,8 @@ export default function TrainerDashboard() {
       bg: 'bg-primary/10' 
     },
     { 
-      label: 'Earnings', 
-      value: `${(userWallet?.balance || 0).toLocaleString()}`, 
-      suffix: ' RWF',
+      label: 'Pending Bookings', 
+      value: trainerPendingBookings.length, 
       icon: Wallet, 
       color: 'text-primary', 
       bg: 'bg-primary/10' 
@@ -147,6 +149,25 @@ export default function TrainerDashboard() {
       color: 'bg-slate-900',
     }
   ];
+
+  const nextSession = trainerAllBookings
+    .filter(
+      (booking) =>
+        booking.status === BookingStatus.APPROVED &&
+        new Date(booking.requestedTime) >= new Date()
+    )
+    .sort(
+      (a, b) => new Date(a.requestedTime).getTime() - new Date(b.requestedTime).getTime()
+    )[0];
+
+  const formatSessionTime = (date: Date) =>
+    new Date(date).toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
@@ -263,7 +284,6 @@ export default function TrainerDashboard() {
                   <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em]">{stat.label}</p>
                   <div className="flex items-baseline gap-1 mt-1">
                      <p className="text-2xl font-playfair font-semibold text-slate-900">{stat.value}</p>
-                     {stat.suffix && <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{stat.suffix}</span>}
                   </div>
                 </div>
               ))}
@@ -320,22 +340,62 @@ export default function TrainerDashboard() {
                <div className="flex items-center gap-8">
                   <div className="w-20 h-20 bg-primary/10 rounded-[28px] shadow-sm flex items-center justify-center text-primary border border-primary/20 relative">
                      <CalendarCheck size={40} />
-                     <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center border-4 border-white text-[10px] font-bold text-slate-900">
-                        1
-                     </div>
+                     {trainerPendingBookings.length > 0 && (
+                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center border-4 border-white text-[10px] font-bold text-slate-900">
+                         {trainerPendingBookings.length}
+                       </div>
+                     )}
                   </div>
                   <div>
                      <p className="text-[11px] font-bold text-primary uppercase tracking-[0.3em] mb-1">Next Session</p>
-                     <h4 className="text-2xl font-playfair font-semibold text-slate-900">Orientation Call: Student Alpha</h4>
-                     <p className="text-slate-500 text-sm font-light mt-1">Scheduled for Today at 14:00 CAT • Virtual Boardroom 04</p>
+                     {nextSession ? (
+                       <>
+                         <h4 className="text-2xl font-playfair font-semibold text-slate-900">
+                           {nextSession.student.firstName} {nextSession.student.lastName}
+                         </h4>
+                         <p className="text-slate-500 text-sm font-light mt-1">
+                           {formatSessionTime(nextSession.requestedTime)}
+                           {nextSession.sessionFormat === 'online' ? ' • Zoom session' : ' • In-person'}
+                         </p>
+                       </>
+                     ) : trainerPendingBookings.length > 0 ? (
+                       <>
+                         <h4 className="text-2xl font-playfair font-semibold text-slate-900">
+                           {trainerPendingBookings.length} pending request{trainerPendingBookings.length !== 1 ? 's' : ''}
+                         </h4>
+                         <p className="text-slate-500 text-sm font-light mt-1">Review and approve booking requests</p>
+                       </>
+                     ) : (
+                       <>
+                         <h4 className="text-2xl font-playfair font-semibold text-slate-900">No upcoming sessions</h4>
+                         <p className="text-slate-500 text-sm font-light mt-1">Approved sessions will appear here</p>
+                       </>
+                     )}
                   </div>
                </div>
                <div className="flex items-center gap-4 w-full lg:w-auto">
-                  <button className="flex-1 lg:flex-none px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10">
-                     Join Call
-                  </button>
-                  <button className="flex-1 lg:flex-none px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-full font-semibold text-sm hover:bg-slate-50 transition-all">
-                     Reschedule
+                  {nextSession?.sessionLocation && nextSession.sessionFormat === 'online' ? (
+                    <a
+                      href={nextSession.sessionLocation}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 lg:flex-none px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10 text-center"
+                    >
+                       Join Call
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => navigate('/dashboard/trainer/bookings')}
+                      className="flex-1 lg:flex-none px-8 py-4 bg-slate-900 text-white rounded-full font-bold text-sm hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10"
+                    >
+                       {trainerPendingBookings.length > 0 ? 'Review Bookings' : 'Open Bookings'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => navigate('/dashboard/trainer/bookings')}
+                    className="flex-1 lg:flex-none px-8 py-4 bg-white border border-slate-200 text-slate-600 rounded-full font-semibold text-sm hover:bg-slate-50 transition-all"
+                  >
+                     All Sessions
                   </button>
                </div>
             </motion.div>

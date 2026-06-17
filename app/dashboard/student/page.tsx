@@ -5,6 +5,7 @@ import { CheckCircle, Lock, CreditCard, Calendar, BookOpen, ArrowRight, Zap, Sta
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { OnboardingChecklist, UserRole } from '@/types';
+import { BookingStatus } from '@/types/booking';
 import BookingCalendar from '@/components/booking/BookingCalendar';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useBooking } from '@/contexts/BookingContext';
@@ -12,7 +13,7 @@ import { useBooking } from '@/contexts/BookingContext';
 export default function StudentDashboard() {
   const { user, isAuthenticated, isLoading: authLoading, onboardingChecklist } = useAuth();
   const { navigate } = useNavigationWithLoading();
-  const { refreshBookings } = useBooking();
+  const { refreshBookings, studentBookings } = useBooking();
 
   // Modal states
   const [showBookingCalendar, setShowBookingCalendar] = useState(false);
@@ -58,6 +59,23 @@ export default function StudentDashboard() {
   const completedSteps = Object.values(onboardingChecklist).filter(Boolean).length;
   const totalSteps = Object.keys(onboardingChecklist).length;
   const progressPercentage = (completedSteps / totalSteps) * 100;
+
+  const upcomingBooking = studentBookings
+    .filter((booking) =>
+      booking.status === BookingStatus.APPROVED || booking.status === BookingStatus.PENDING
+    )
+    .sort(
+      (a, b) => new Date(a.requestedTime).getTime() - new Date(b.requestedTime).getTime()
+    )[0];
+
+  const formatSessionTime = (date: Date) =>
+    new Date(date).toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
@@ -180,13 +198,38 @@ export default function StudentDashboard() {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                     <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                    {upcomingBooking ? (
+                      <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
+                        <Calendar className="text-primary w-6 h-6 shrink-0" />
+                        <div>
+                          <p className="text-white font-bold">
+                            {upcomingBooking.status === BookingStatus.APPROVED
+                              ? 'Orientation Session'
+                              : 'Booking Pending Approval'}
+                          </p>
+                          <p className="text-slate-400 text-xs">
+                            {formatSessionTime(upcomingBooking.requestedTime)}
+                            {upcomingBooking.status === BookingStatus.APPROVED
+                              ? ' • Zoom link in email & calendar'
+                              : ' • Waiting for trainer confirmation'}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-4 p-4 bg-white/5 rounded-2xl border border-white/10">
                         <Calendar className="text-primary w-6 h-6" />
                         <div>
-                          <p className="text-white font-bold">Orientation Call</p>
-                          <p className="text-slate-400 text-xs">Confirmed • Zoom Link in Email</p>
+                          <p className="text-white font-bold">Orientation Booked</p>
+                          <p className="text-slate-400 text-xs">Check Sessions & Calendar for details</p>
                         </div>
-                     </div>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => navigate('/dashboard/student/calendar')}
+                      className="w-full py-3 bg-white/10 text-white rounded-xl font-bold text-sm hover:bg-white/15 transition-colors"
+                    >
+                      View Sessions
+                    </button>
                   </div>
                 )}
               </div>

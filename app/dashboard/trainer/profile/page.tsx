@@ -5,48 +5,61 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import { User, Mail, Shield, Bell, Calendar, MapPin, Edit2, Check, Phone, Globe, Briefcase, Award, ChevronRight, Settings, Star, Zap, Upload } from 'lucide-react';
 import { useAuth } from '@/contexts';
 import { Trainer, UserRole } from '@/types';
-import { BASE_URL, userService } from '@/services';
+import { BASE_URL, userService, statsService } from '@/services';
+import type { TrainerStats } from '@/services/stats';
 import Image from 'next/image';
 
 export default function TrainerProfilePage() {
     const { user, updateUserProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [trainerStats, setTrainerStats] = useState<TrainerStats | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const trainerUser = user as Trainer;
 
     const [profileData, setProfileData] = useState({
-        name: user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'Demi Wilkinson',
-        email: user?.email || 'd.wilkinson@dreamize.rw',
-        phone: user?.phoneNumber || '+250 788 111 222',
-        location: 'Kigali, Rwanda',
-        bio: 'Senior Software Engineer with 8+ years of experience in React, Node.js and Cloud Architecture. Passionate about mentoring the next generation of African developers.',
-        expertise: trainerUser?.skills && trainerUser.skills.length > 0 ? trainerUser.skills : ['Full Stack Development', 'Cloud Architecture', 'React & Next.js', 'System Design'],
-        experience: trainerUser?.experience?.yearsOfExperience ? `${trainerUser.experience.yearsOfExperience}+ Years` : '8+ Years',
-        field: trainerUser?.experience?.specializations?.[0] || 'Software Engineering',
-        joinDate: user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Jan 2023'
+        name: '',
+        email: '',
+        phone: '',
+        bio: '',
+        expertise: [] as string[],
+        experience: '',
+        field: '',
+        joinDate: '',
     });
+
+    useEffect(() => {
+        statsService.getMyStats().then((response) => {
+            if (response.success && response.data) {
+                setTrainerStats(response.data as TrainerStats);
+            }
+        }).catch(() => setTrainerStats(null));
+    }, []);
 
     useEffect(() => {
         if (user) {
             const tUser = user as Trainer;
             setProfileData({
-                name: `${user.firstName} ${user.lastName}`,
+                name: `${user.firstName} ${user.lastName}`.trim(),
                 email: user.email,
-                phone: user.phoneNumber || '+250 788 111 222',
-                location: 'Kigali, Rwanda',
-                bio: 'Senior Software Engineer with 8+ years of experience in React, Node.js and Cloud Architecture. Passionate about mentoring the next generation of African developers.',
-                expertise: tUser.skills && tUser.skills.length > 0 ? tUser.skills : ['Full Stack Development', 'Cloud Architecture', 'React & Next.js', 'System Design'],
-                experience: tUser.experience?.yearsOfExperience ? `${tUser.experience.yearsOfExperience}+ Years` : '8+ Years',
-                field: tUser.experience?.specializations?.[0] || 'Software Engineering',
-                joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Jan 2023'
+                phone: user.phoneNumber || 'Not set',
+                bio: tUser.experience?.specializations?.length
+                    ? `Specializations: ${tUser.experience.specializations.join(', ')}`
+                    : 'Trainer profile',
+                expertise: tUser.skills && tUser.skills.length > 0 ? tUser.skills : [],
+                experience: tUser.experience?.yearsOfExperience
+                    ? `${tUser.experience.yearsOfExperience}+ Years`
+                    : 'Not set',
+                field: tUser.experience?.specializations?.[0] || 'Trainer',
+                joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—',
             });
         }
     }, [user]);
 
     const handleSave = async () => {
-        setIsEditing(false);
+        setIsSaving(true);
         try {
             const nameParts = profileData.name.trim().split(/\s+/);
             const firstName = nameParts[0] || '';
@@ -55,10 +68,13 @@ export default function TrainerProfilePage() {
                 firstName,
                 lastName,
                 email: profileData.email,
-                phoneNumber: profileData.phone,
+                phoneNumber: profileData.phone === 'Not set' ? '' : profileData.phone,
             });
+            setIsEditing(false);
         } catch (error) {
             console.error('Error saving profile:', error);
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -249,20 +265,11 @@ export default function TrainerProfilePage() {
                                             )}
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Location</label>
-                                            {isEditing ? (
-                                                <input
-                                                    type="text"
-                                                    value={profileData.location}
-                                                    onChange={(e) => setProfileData({ ...profileData, location: e.target.value })}
-                                                    className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all font-medium"
-                                                />
-                                            ) : (
-                                                <div className="px-5 py-3.5 bg-slate-50/50 border border-transparent rounded-xl flex items-center justify-between">
-                                                    <p className="text-slate-900 font-semibold">{profileData.location}</p>
-                                                    <MapPin className="w-4 h-4 text-slate-300" />
-                                                </div>
-                                            )}
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Specialization</label>
+                                            <div className="px-5 py-3.5 bg-slate-50/50 border border-transparent rounded-xl flex items-center justify-between">
+                                                <p className="text-slate-900 font-semibold">{profileData.field}</p>
+                                                <Briefcase className="w-4 h-4 text-slate-300" />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="mt-10 pt-10 border-t border-slate-50">
@@ -340,14 +347,18 @@ export default function TrainerProfilePage() {
                                     </h3>
                                     <div className="space-y-4">
                                         <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white hover:shadow-lg transition-all">
-                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Students</span>
-                                            <span className="text-2xl font-playfair font-semibold text-slate-900">124</span>
+                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Assigned Students</span>
+                                            <span className="text-2xl font-playfair font-semibold text-slate-900">
+                                                {trainerStats?.assignedStudents ?? 0}
+                                            </span>
                                         </div>
                                         <div className="p-6 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center group hover:bg-white hover:shadow-lg transition-all border-l-4 border-l-primary">
-                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Avg. Rating</span>
+                                            <span className="text-sm text-slate-500 font-bold uppercase tracking-wider">Upcoming Sessions</span>
                                             <div className="flex items-center gap-2">
                                                 <Star className="w-4 h-4 text-primary fill-primary" />
-                                                <span className="text-2xl font-playfair font-semibold text-slate-900">4.9</span>
+                                                <span className="text-2xl font-playfair font-semibold text-slate-900">
+                                                    {trainerStats?.upcomingSessions ?? 0}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>

@@ -25,9 +25,10 @@ export interface Wallet {
 
 export interface Payment {
   id: string;
-  studentId: string;
+  student?: string;
   type: 'orientation' | 'subscription';
   amount: number;
+  finalAmount?: number;
   status: 'pending' | 'success' | 'failed';
   transactionRef: string;
   paidAt: string;
@@ -49,7 +50,11 @@ export interface Subscription {
 
 class FinancialService {
   async getMyPayments(): Promise<ApiResponse<Payment[]>> {
-    return apiClient.get<Payment[]>(API_ENDPOINTS.STATS_ME);
+    return apiClient.get<Payment[]>(API_ENDPOINTS.PAYMENT_HISTORY);
+  }
+
+  async getSubscriptionStatus(): Promise<ApiResponse<Record<string, unknown>>> {
+    return apiClient.get<Record<string, unknown>>(API_ENDPOINTS.PAYMENT_SUBSCRIPTION_STATUS);
   }
 }
 

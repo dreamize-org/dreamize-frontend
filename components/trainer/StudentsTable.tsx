@@ -215,12 +215,12 @@ export default function StudentsTable({ searchQuery, selectedStatus }: StudentsT
     setSelectedStudents(selectedItems);
   };
 
-  const handleFilterChange = (filters: Record<string, unknown>) => {
-    console.log('Filters:', filters);
+  const handleFilterChange = (_filters: Record<string, unknown>) => {
+    // Client-side filtering is handled in the table component
   };
 
-  const handleSearchChange = (searchQuery: string) => {
-    console.log('Search:', searchQuery);
+  const handleSearchChange = (_searchQuery: string) => {
+    // Client-side search is handled in the table component
   };
 
   return (

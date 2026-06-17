@@ -49,6 +49,8 @@ export const API_ENDPOINTS = {
   PAYMENT_ORIANTATION: '/api/payments/orientation',
   PAYMENT_SUBSCRIPTION: '/api/payments/subscription',
   PAYMENT_CONFIRM: (id: string) => `/api/payments/${id}/confirm`,
+  PAYMENT_HISTORY: '/api/payments/history',
+  PAYMENT_SUBSCRIPTION_STATUS: '/api/payments/subscription',
   STATS_ME: '/api/stats/me',
   NOTIFICATIONS: '/api/notifications',
   NOTIFICATION_BY_ID: (id: string) => `/api/notifications/${id}`,
