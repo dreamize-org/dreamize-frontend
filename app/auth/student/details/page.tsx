@@ -6,79 +6,74 @@ import { AuthContainer } from '@/components/auth/auth-container';
 import { AuthCard } from '@/components/auth/auth-card';
 import { PremiumInput } from '@/components/ui/premium-input';
 import { PremiumButton } from '@/components/ui/premium-button';
-import { Calendar, User, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
+import { User, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { UserRole, StudentRegister } from '@/types';
+import { AgeRange, UserRole, StudentRegister } from '@/types';
+
+const AGE_RANGE_OPTIONS: { value: AgeRange; label: string }[] = [
+  { value: 'under-13', label: 'Under 13' },
+  { value: '13-17', label: '13–17' },
+  { value: '18-24', label: '18–24' },
+  { value: '25-34', label: '25–34' },
+  { value: '35+', label: '35+' },
+];
+
+const GUARDIAN_RELATIONSHIPS = ['Parent', 'Guardian', 'Sibling', 'Sponsor', 'Other'];
 
 export default function StudentDetailsPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
-    dateOfBirth: '',
+    ageRange: '' as AgeRange | '',
     gender: '',
     guardianName: '',
+    guardianRelationship: '',
     guardianEmail: '',
-    guardianPhoneNumber: ''
+    guardianPhoneNumber: '',
   });
-  const [errors, setErrors] = useState({
-    dateOfBirth: '',
-    gender: '',
-    guardianName: '',
-    guardianEmail: '',
-    guardianPhoneNumber: ''
-  });
-  const [showGuardianFields, setShowGuardianFields] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const { registerStudent, isLoading, error, clearError } = useAuth();
 
-  const handleChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: '' }));
+  const guardianRequired =
+    formData.ageRange === 'under-13' || formData.ageRange === '13-17';
 
-    // Check if student is under 15 to show guardian fields
-    if (field === 'dateOfBirth' && value) {
-      const birthDate = new Date(value);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
-      setShowGuardianFields(actualAge < 15);
-    }
+  const handleChange = (field: string, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: '' }));
   };
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
-    const newErrors = {
-      dateOfBirth: '',
-      gender: '',
-      guardianName: '',
-      guardianEmail: '',
-      guardianPhoneNumber: ''
-    };
+    const newErrors: Record<string, string> = {};
 
-    if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (!formData.ageRange) newErrors.ageRange = 'Please select your age range';
     if (!formData.gender) newErrors.gender = 'Please select your gender';
 
-    // Check if guardian fields are required
-    if (formData.dateOfBirth) {
-      const birthDate = new Date(formData.dateOfBirth);
-      const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      const actualAge = monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate()) ? age - 1 : age;
+    const hasAnyGuardianField =
+      formData.guardianName.trim() ||
+      formData.guardianEmail.trim() ||
+      formData.guardianPhoneNumber.trim() ||
+      formData.guardianRelationship.trim();
 
-      if (actualAge < 15) {
-        if (!formData.guardianName) newErrors.guardianName = 'Guardian name is required for students under 15';
-        if (!formData.guardianEmail) newErrors.guardianEmail = 'Guardian email is required for students under 15';
-        if (!formData.guardianPhoneNumber) newErrors.guardianPhoneNumber = 'Guardian phone number is required for students under 15';
+    if (guardianRequired || hasAnyGuardianField) {
+      if (!formData.guardianName.trim()) {
+        newErrors.guardianName = guardianRequired
+          ? 'Guardian name is required for students under 18'
+          : 'Guardian name is required when adding guardian details';
+      }
+      if (!formData.guardianEmail.trim()) {
+        newErrors.guardianEmail = guardianRequired
+          ? 'Guardian email is required for students under 18'
+          : 'Guardian email is required when adding guardian details';
+      }
+      if (guardianRequired && !formData.guardianRelationship.trim()) {
+        newErrors.guardianRelationship = 'Relationship is required for students under 18';
       }
     }
 
     setErrors(newErrors);
-
-    if (Object.values(newErrors).some(error => error !== '')) {
-      return;
-    }
+    if (Object.keys(newErrors).length > 0) return;
 
     try {
       const baseData = {
@@ -86,7 +81,7 @@ export default function StudentDetailsPage() {
         firstName: localStorage.getItem('userFirstName') || '',
         lastName: localStorage.getItem('userLastName') || '',
         email: localStorage.getItem('userEmail') || '',
-        password: localStorage.getItem('userPassword') || ''
+        password: localStorage.getItem('userPassword') || '',
       };
 
       const studentData: StudentRegister = {
@@ -98,17 +93,22 @@ export default function StudentDetailsPage() {
         role: UserRole.STUDENT,
         isActive: true,
         gender: formData.gender,
-        dateOfBirth: new Date(formData.dateOfBirth).toISOString().split('T')[0],
+        ageRange: formData.ageRange as AgeRange,
         isVerified: false,
         otpCode: '',
-        otpExpiry: "",
+        otpExpiry: '',
         resetToken: '',
-        resetTokenExpiry: "",
-        createdAt: "",
-        updatedAt: "",
-        guardianName: formData.guardianName,
-        guardianEmail: formData.guardianEmail,
-        guardianPhoneNumber: formData.guardianPhoneNumber
+        resetTokenExpiry: '',
+        createdAt: '',
+        updatedAt: '',
+        ...(formData.guardianEmail.trim()
+          ? {
+              guardianName: formData.guardianName.trim(),
+              guardianEmail: formData.guardianEmail.trim(),
+              guardianPhoneNumber: formData.guardianPhoneNumber.trim(),
+              guardianRelationship: formData.guardianRelationship.trim() || undefined,
+            }
+          : {}),
       };
 
       await registerStudent(studentData);
@@ -132,17 +132,31 @@ export default function StudentDetailsPage() {
 
         <form onSubmit={handleContinue} className="space-y-6 mt-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <PremiumInput
-              label="Date of Birth"
-              type="date"
-              id="dateOfBirth"
-              max={new Date().toISOString().split('T')[0]}
-              value={formData.dateOfBirth}
-              onChange={(e) => handleChange('dateOfBirth', e.target.value)}
-              error={errors.dateOfBirth}
-              icon={<Calendar size={18} />}
-              required
-            />
+            <div className="space-y-2">
+              <label className="block text-[13px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                Age Range
+              </label>
+              <div className="relative">
+                <select
+                  id="ageRange"
+                  value={formData.ageRange}
+                  onChange={(e) => handleChange('ageRange', e.target.value)}
+                  className={`w-full pl-4 pr-10 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none text-slate-900 font-medium ${errors.ageRange ? 'border-red-500' : 'border-slate-100'}`}
+                  required
+                >
+                  <option value="">Select age range</option>
+                  {AGE_RANGE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+              {errors.ageRange && (
+                <p className="text-[12px] text-red-500 font-medium ml-1 italic">{errors.ageRange}</p>
+              )}
+            </div>
 
             <div className="space-y-2">
               <label className="block text-[13px] font-bold text-slate-400 uppercase tracking-widest ml-1">
@@ -153,77 +167,101 @@ export default function StudentDetailsPage() {
                   id="gender"
                   value={formData.gender}
                   onChange={(e) => handleChange('gender', e.target.value)}
-                  className={`
-                    w-full pl-4 pr-10 py-3 bg-slate-50 border rounded-xl 
-                    focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary 
-                    transition-all appearance-none text-slate-900 font-medium
-                    ${errors.gender ? 'border-red-500' : 'border-slate-100'}
-                  `}
+                  className={`w-full pl-4 pr-10 py-3 bg-slate-50 border rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none text-slate-900 font-medium ${errors.gender ? 'border-red-500' : 'border-slate-100'}`}
                   required
                 >
                   <option value="">Select</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
-                  <option value="prefer-not-to-say">N/A</option>
+                  <option value="prefer-not-to-say">Prefer not to say</option>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
               </div>
-              {errors.gender && <p className="text-[12px] text-red-500 font-medium ml-1 italic">{errors.gender}</p>}
+              {errors.gender && (
+                <p className="text-[12px] text-red-500 font-medium ml-1 italic">{errors.gender}</p>
+              )}
             </div>
           </div>
 
-          {/* Guardian Fields - Show for students under 15 */}
-          {showGuardianFields && (
-            <div className="bg-primary/5 border border-primary/10 rounded-2xl p-6 space-y-4 animate-in fade-in slide-in-from-top-2 duration-500">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <h3 className="text-[14px] font-bold text-slate-800">Guardian Information</h3>
-                  <p className="text-[12px] text-slate-500">Required for students under 15 years old.</p>
-                </div>
+          <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-4">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-primary">
+                <ShieldCheck size={20} />
               </div>
-
-              <PremiumInput
-                label="Guardian Full Name"
-                type="text"
-                id="guardianName"
-                value={formData.guardianName}
-                onChange={(e) => handleChange('guardianName', e.target.value)}
-                placeholder="Full Name"
-                error={errors.guardianName}
-                icon={<User size={18} />}
-                required={showGuardianFields}
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <PremiumInput
-                  label="Guardian Email"
-                  type="email"
-                  id="guardianEmail"
-                  value={formData.guardianEmail}
-                  onChange={(e) => handleChange('guardianEmail', e.target.value)}
-                  placeholder="email@example.com"
-                  error={errors.guardianEmail}
-                  icon={<Mail size={18} />}
-                  required={showGuardianFields}
-                />
-                <PremiumInput
-                  label="Guardian Phone"
-                  type="tel"
-                  id="guardianPhoneNumber"
-                  value={formData.guardianPhoneNumber}
-                  onChange={(e) => handleChange('guardianPhoneNumber', e.target.value)}
-                  placeholder="+250..."
-                  error={errors.guardianPhoneNumber}
-                  icon={<Phone size={18} />}
-                  required={showGuardianFields}
-                />
+              <div>
+                <h3 className="text-[14px] font-bold text-slate-800">Guardian Information</h3>
+                <p className="text-[12px] text-slate-500">
+                  {guardianRequired
+                    ? 'Required for students under 18. We will email them an invitation.'
+                    : 'Optional — add a parent or sponsor who should monitor progress.'}
+                </p>
               </div>
             </div>
-          )}
+
+            <PremiumInput
+              label="Guardian Full Name"
+              type="text"
+              id="guardianName"
+              value={formData.guardianName}
+              onChange={(e) => handleChange('guardianName', e.target.value)}
+              placeholder="Full Name"
+              error={errors.guardianName}
+              icon={<User size={18} />}
+              required={guardianRequired}
+            />
+
+            <div className="space-y-2">
+              <label className="block text-[13px] font-bold text-slate-400 uppercase tracking-widest ml-1">
+                Relationship
+              </label>
+              <div className="relative">
+                <select
+                  id="guardianRelationship"
+                  value={formData.guardianRelationship}
+                  onChange={(e) => handleChange('guardianRelationship', e.target.value)}
+                  className={`w-full pl-4 pr-10 py-3 bg-white border rounded-xl focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all appearance-none text-slate-900 font-medium ${errors.guardianRelationship ? 'border-red-500' : 'border-slate-100'}`}
+                >
+                  <option value="">Select relationship</option>
+                  {GUARDIAN_RELATIONSHIPS.map((relationship) => (
+                    <option key={relationship} value={relationship}>
+                      {relationship}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+              {errors.guardianRelationship && (
+                <p className="text-[12px] text-red-500 font-medium ml-1 italic">
+                  {errors.guardianRelationship}
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <PremiumInput
+                label="Guardian Email"
+                type="email"
+                id="guardianEmail"
+                value={formData.guardianEmail}
+                onChange={(e) => handleChange('guardianEmail', e.target.value)}
+                placeholder="email@example.com"
+                error={errors.guardianEmail}
+                icon={<Mail size={18} />}
+                required={guardianRequired}
+              />
+              <PremiumInput
+                label="Guardian Phone"
+                type="tel"
+                id="guardianPhoneNumber"
+                value={formData.guardianPhoneNumber}
+                onChange={(e) => handleChange('guardianPhoneNumber', e.target.value)}
+                placeholder="+250..."
+                error={errors.guardianPhoneNumber}
+                icon={<Phone size={18} />}
+              />
+            </div>
+          </div>
 
           {error && (
             <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
@@ -232,16 +270,12 @@ export default function StudentDetailsPage() {
           )}
 
           <div className="pt-2">
-            <PremiumButton
-              type="submit"
-              isLoading={isLoading}
-            >
+            <PremiumButton type="submit" isLoading={isLoading}>
               {isLoading ? 'Creating Account...' : 'Complete Registration'}
               <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
             </PremiumButton>
           </div>
 
-          {/* Progress indicators */}
           <div className="flex justify-center items-center gap-3 pt-4">
             <div className="h-2 w-2 bg-slate-200 rounded-full"></div>
             <div className="h-2 w-12 bg-primary rounded-full shadow-sm shadow-primary/20"></div>

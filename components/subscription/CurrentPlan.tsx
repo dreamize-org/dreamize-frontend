@@ -3,6 +3,11 @@
 import { ArrowRight, CheckCircle, Clock, Calendar, Shield, AlertCircle } from 'lucide-react';
 import { useFinancial, useAuth, useUsers } from '@/contexts';
 import { useMemo } from 'react';
+import {
+  getSubscriptionColorClasses,
+  getSubscriptionColorFromDays,
+  getSubscriptionStatusLabel,
+} from '@/lib/subscription/access';
 
 const features = [
   'Access to wing companies & mentors',
@@ -59,6 +64,9 @@ export default function CurrentPlan() {
   };
 
   const daysRemaining = getDaysRemaining();
+  const colorCode = getSubscriptionColorFromDays(daysRemaining);
+  const colorClasses = getSubscriptionColorClasses(colorCode);
+  const statusLabel = getSubscriptionStatusLabel(colorCode, daysRemaining);
 
   // Calculate progress percentage
   const getProgress = () => {
@@ -121,8 +129,8 @@ export default function CurrentPlan() {
               <div className="text-2xl font-bold text-gray-900">
                 {activeSub.amount.toLocaleString()} {activeSub.currency}
               </div>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 mt-1">
-                Active
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-1 ${colorClasses.badge}`}>
+                {statusLabel}
               </span>
             </div>
           </div>
@@ -134,14 +142,12 @@ export default function CurrentPlan() {
                 <Clock className="w-4 h-4" />
                 {daysRemaining} days remaining
               </span>
-              <span className="font-medium text-gray-900">{progress.toFixed(0)}% used</span>
+              <span className={`font-medium ${colorClasses.text}`}>{statusLabel}</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className={`h-2 rounded-full transition-all duration-500 ${
-                  progress > 80 ? 'bg-red-500' : progress > 50 ? 'bg-yellow-500' : 'bg-green-500'
-                }`}
-                style={{ width: `${progress}%` }}
+                className={`h-2 rounded-full transition-all duration-500 ${colorClasses.bar}`}
+                style={{ width: `${Math.max(4, Math.min(100, (daysRemaining / 30) * 100))}%` }}
               />
             </div>
           </div>

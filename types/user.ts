@@ -59,9 +59,13 @@ export interface Guardian extends BaseUser {
   passwordSetAt: string | null;
 }
 
+export type AgeRange = 'under-13' | '13-17' | '18-24' | '25-34' | '35+';
+
 export interface Student extends BaseUser {
   role: UserRole.STUDENT;
+  ageRange?: AgeRange;
   guardianIds: string[];
+  guardianRelationship?: string | null;
   hasPaidOrientation: boolean;
   hasActiveSubscription: boolean;
   subscriptionExpiryDate: string | null;
@@ -83,7 +87,9 @@ export interface Trainer extends BaseUser {
 
 
 export interface StudentRegister extends Partial<BaseUser> {
-  guardianName: string;
-  guardianEmail: string;
-  guardianPhoneNumber: string;
+  ageRange?: AgeRange;
+  guardianName?: string;
+  guardianEmail?: string;
+  guardianPhoneNumber?: string;
+  guardianRelationship?: string;
 }
