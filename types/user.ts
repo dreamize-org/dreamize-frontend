@@ -72,6 +72,9 @@ export interface Student extends BaseUser {
   onboardingStatus: OnboardingChecklist;
   assignedTrainerId: string | null;
   currentRoadmapId: string | null;
+  bio?: string;
+  publicProfileSlug?: string;
+  isPublicProfileEnabled?: boolean;
 }
 
 export interface Trainer extends BaseUser {

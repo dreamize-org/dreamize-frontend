@@ -2,11 +2,12 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { User, Mail, Shield, Bell, Calendar, Edit2, Check, Phone, Briefcase, Award, ChevronRight, Settings, Star, Upload, Loader2 } from 'lucide-react';
+import { User, Mail, Shield, Bell, Calendar, Edit2, Check, Phone, Briefcase, Award, ChevronRight, Settings, Star, Upload, Loader2, ExternalLink } from 'lucide-react';
 import { useAuth } from '@/contexts';
 import { UserRole, Student } from '@/types';
-import { BASE_URL, userService, statsService } from '@/services';
+import { BASE_URL, userService, statsService, publicProfileService } from '@/services';
 import type { StudentStats } from '@/services/stats';
+import type { CertificateRecord } from '@/services/certificates';
 import Image from 'next/image';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
 
@@ -26,7 +27,9 @@ export default function StudentProfilePage() {
         email: '',
         phone: '',
         joinDate: '',
+        bio: '',
     });
+    const [publicProfileUrl, setPublicProfileUrl] = useState('');
 
     useEffect(() => {
         if (!user) return;
@@ -35,8 +38,21 @@ export default function StudentProfilePage() {
             email: user.email,
             phone: user.phoneNumber || 'Not set',
             joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—',
+            bio: (user as Student).bio || '',
         });
     }, [user]);
+
+    useEffect(() => {
+        if (!user?._id) return;
+        publicProfileService
+            .getStudentProfile(user._id)
+            .then((response) => {
+                if (response.success && response.data?.slug) {
+                    setPublicProfileUrl(publicProfileService.getPublicProfileUrl(response.data.slug));
+                }
+            })
+            .catch(() => undefined);
+    }, [user?._id]);
 
     useEffect(() => {
         statsService.getMyStats().then((response) => {
@@ -57,6 +73,7 @@ export default function StudentProfilePage() {
                 lastName,
                 email: profileData.email,
                 phoneNumber: profileData.phone === 'Not set' ? '' : profileData.phone,
+                bio: profileData.bio,
             });
             setIsEditing(false);
         } catch (error) {
@@ -260,6 +277,42 @@ export default function StudentProfilePage() {
                                             )}
                                         </div>
                                     </div>
+
+                                    <div className="space-y-2 mt-6">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Bio</label>
+                                        {isEditing ? (
+                                            <textarea
+                                                value={profileData.bio}
+                                                onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                                                rows={4}
+                                                placeholder="Tell visitors about your learning journey and goals..."
+                                                className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 outline-none transition-all font-medium resize-none"
+                                            />
+                                        ) : (
+                                            <div className="px-5 py-3.5 bg-slate-50/50 border border-transparent rounded-xl">
+                                                <p className="text-slate-700 font-light leading-relaxed">
+                                                    {profileData.bio || 'Add a bio to appear on your public portfolio.'}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {publicProfileUrl && (
+                                        <div className="mt-6 p-4 bg-primary/5 border border-primary/10 rounded-2xl">
+                                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+                                                Public Portfolio
+                                            </p>
+                                            <a
+                                                href={publicProfileUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline break-all"
+                                            >
+                                                {publicProfileUrl}
+                                                <ExternalLink className="w-4 h-4 shrink-0" />
+                                            </a>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-8">

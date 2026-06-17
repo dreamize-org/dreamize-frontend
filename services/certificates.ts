@@ -28,6 +28,31 @@ class CertificateService {
     }
     return `${BASE_URL}${certificate.pdfUrl || API_ENDPOINTS.CERTIFICATE_VIEW(certificate._id)}`;
   }
+
+  getDownloadUrl(certificateId: string): string {
+    return `${BASE_URL}${API_ENDPOINTS.CERTIFICATE_DOWNLOAD(certificateId)}`;
+  }
+
+  async downloadCertificate(certificateId: string, filename: string) {
+    const token = localStorage.getItem('auth_token');
+    const response = await fetch(this.getDownloadUrl(certificateId), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!response.ok) {
+      throw new Error('Unable to download certificate');
+    }
+
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = `${filename}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+  }
 }
 
 export const certificateService = new CertificateService();

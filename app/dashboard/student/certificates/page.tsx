@@ -207,27 +207,48 @@ export default function CertificatesPage() {
                         </div>
                       </div>
 
-                      <button
-                        onClick={async () => {
-                          setOpeningId(cert._id);
-                          try {
-                            await openCertificateView(cert._id);
-                          } catch (err) {
-                            setError(err instanceof Error ? err.message : 'Failed to open certificate');
-                          } finally {
-                            setOpeningId(null);
-                          }
-                        }}
-                        disabled={openingId === cert._id}
-                        className="w-full mt-6 flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors disabled:opacity-60"
-                      >
-                        {openingId === cert._id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                        View / Download
-                      </button>
+                      <div className="flex gap-2 mt-6">
+                        <button
+                          onClick={async () => {
+                            setOpeningId(cert._id);
+                            try {
+                              await openCertificateView(cert._id);
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'Failed to open certificate');
+                            } finally {
+                              setOpeningId(null);
+                            }
+                          }}
+                          disabled={openingId === cert._id}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-full hover:bg-slate-50 transition-colors disabled:opacity-60"
+                        >
+                          View
+                        </button>
+                        <button
+                          onClick={async () => {
+                            setOpeningId(cert._id);
+                            try {
+                              await certificateService.downloadCertificate(
+                                cert._id,
+                                cert.certificateNumber
+                              );
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : 'Failed to download certificate');
+                            } finally {
+                              setOpeningId(null);
+                            }
+                          }}
+                          disabled={openingId === cert._id}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors disabled:opacity-60"
+                        >
+                          {openingId === cert._id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                          Download PDF
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}

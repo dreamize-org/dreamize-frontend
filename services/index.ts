@@ -8,6 +8,8 @@ export { notificationService } from './notification';
 export { messageService } from './messages';
 export { fileService } from './files';
 export { certificateService } from './certificates';
+export { publicProfileService } from './publicProfile';
+export type { PublicStudentProfile } from './publicProfile';
 export type { MessageAttachment } from './files';
 export type { CertificateRecord } from './certificates';
 export { default as socketService } from './socket';

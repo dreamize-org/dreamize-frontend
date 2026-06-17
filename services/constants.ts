@@ -46,6 +46,8 @@ export const API_ENDPOINTS = {
   CERTIFICATES: '/api/certificates',
   CERTIFICATE_BY_ID: (id: string) => `/api/certificates/${id}`,
   CERTIFICATE_VIEW: (id: string) => `/api/certificates/${id}/view`,
+  CERTIFICATE_DOWNLOAD: (id: string) => `/api/certificates/${id}/download`,
+  PUBLIC_STUDENT_PROFILE: (identifier: string) => `/api/public/students/${identifier}`,
   PAYMENT_ORIANTATION: '/api/payments/orientation',
   PAYMENT_SUBSCRIPTION: '/api/payments/subscription',
   PAYMENT_CONFIRM: (id: string) => `/api/payments/${id}/confirm`,
@@ -76,6 +78,8 @@ export const API_ENDPOINTS = {
   GUARDIAN_DECLINE_INVITE: '/api/guardian/invite/decline',
   GUARDIAN_STUDENTS: '/api/guardian/students',
   GUARDIAN_STUDENT_BY_ID: (id: string) => `/api/guardian/students/${id}`,
+  GUARDIAN_STUDENT_CERTIFICATES: (id: string) => `/api/guardian/students/${id}/certificates`,
+  GUARDIAN_STUDENT_PROJECTS: (id: string) => `/api/guardian/students/${id}/projects`,
   
   FILES: {
     UPLOAD_AVATAR: '/api/files/avatar',
