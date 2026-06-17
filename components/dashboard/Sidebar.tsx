@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Home, Calendar, CalendarCheck, CreditCard, MessageSquare, X, Settings, Menu, User, LogOut, Lock, Users, Award, BookOpen, Ticket, Server, UserCheck } from 'lucide-react';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { useAuth } from '@/contexts';
+import { useChatUnreadCount } from '@/hooks/useChatUnreadCount';
 import { SidebarProps, SidebarItem } from '@/types';
 import { Logo } from '../ui/Logo';
 import { BASE_URL } from '@/services';
@@ -13,6 +14,7 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { navigate } = useNavigationWithLoading();
   const { user, logout } = useAuth();
+  const { unreadCount: chatUnreadCount } = useChatUnreadCount();
 
   const currentUserType = user?.role || userType || 'student';
   const userName = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'User';
@@ -118,7 +120,17 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
         </div>
 
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
-          {sidebarItems.map((item) => (
+          {sidebarItems.map((item) => {
+            const isChatItem = item.label === 'Chat';
+            const chatBadge =
+              isChatItem && chatUnreadCount > 0
+                ? chatUnreadCount > 99
+                  ? '99+'
+                  : String(chatUnreadCount)
+                : undefined;
+            const badge = chatBadge ?? item.badge;
+
+            return (
             <div key={item.label} className="relative group">
               <button
                 onClick={() => !item.disabled && handleNavigation(item)}
@@ -145,10 +157,17 @@ export default function Sidebar({ activeItem = 'Home', userType }: SidebarProps)
 
                 <span className="flex-1 text-[14px] tracking-wide">{item.label}</span>
 
+                {badge && (
+                  <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-[10px] font-bold text-slate-900 flex items-center justify-center shrink-0">
+                    {badge}
+                  </span>
+                )}
+
                 {item.disabled && <Lock className="w-3.5 h-3.5 text-slate-500" />}
               </button>
             </div>
-          ))}
+            );
+          })}
         </nav>
 
         <div className="p-6 mt-auto border-t border-[#cda429]/10 bg-gradient-to-t from-primary/[0.02] to-transparent">

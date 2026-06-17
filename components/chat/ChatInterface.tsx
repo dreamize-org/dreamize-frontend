@@ -22,6 +22,7 @@ import { getMessagePreview } from '@/services/messages';
 import { BASE_URL } from '@/services/constants';
 import { useAuth } from '@/contexts/AuthContext';
 import { getAuthUserId, normalizeId } from '@/lib/auth/session';
+import { notifyChatUnreadSync } from '@/hooks/useChatUnreadCount';
 
 interface DisplayMessage {
   id: string;
@@ -235,12 +236,15 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
       });
 
       if (senderId !== myId) {
-        messageService.markAsRead(contactId).catch(() => undefined);
-        setContacts((prev) =>
-          prev.map((entry) =>
-            normalizeId(entry.contact._id) === contactId ? { ...entry, unreadCount: 0 } : entry
-          )
-        );
+        if (normalizeId(activeContact?._id) === contactId) {
+          messageService.markAsRead(contactId).catch(() => undefined);
+          setContacts((prev) =>
+            prev.map((entry) =>
+              normalizeId(entry.contact._id) === contactId ? { ...entry, unreadCount: 0 } : entry
+            )
+          );
+        }
+        notifyChatUnreadSync();
       }
     };
 
@@ -281,6 +285,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
             normalizeId(item.contact._id) === contact._id ? { ...item, unreadCount: 0 } : item
           )
         );
+        notifyChatUnreadSync();
       } catch {
         setMessages([]);
       } finally {
