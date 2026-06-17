@@ -1,42 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Calendar, Clock, User, CheckCircle, MessageSquare } from 'lucide-react';
+import { X, Calendar, Clock, User, CheckCircle, MessageSquare, AlertCircle } from 'lucide-react';
 import { useUsers } from '@/contexts';
-import { Trainer,  StudentBookingRequest } from '@/types';
-import { useBooking } from '@/hooks/useBooking';
+import { Trainer, StudentBookingRequest } from '@/types';
+import { useCreateBooking } from '@/hooks/useBooking';
 
 interface BookingCalendarProps {
   onClose: () => void;
   onSuccess: () => void;
 }
 
-
-
 export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarProps) {
-  const { trainers } = useUsers()
-  const { createBooking, isLoading } = useBooking();
+  const { trainers } = useUsers();
+  const { createBooking, isLoading, error } = useCreateBooking();
   const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedTime, setSelectedTime] = useState('');
   const [learningGoals, setLearningGoals] = useState('');
+  const [submitError, setSubmitError] = useState('');
   const [bookingStep, setBookingStep] = useState<'select' | 'confirm' | 'submitting' | 'success'>('select');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!selectedTrainer || !selectedDate || !selectedTime || !learningGoals.trim()) {
-      alert('Please fill in all fields');
+      setSubmitError('Please fill in all fields');
       return;
     }
-    
+
+    setSubmitError('');
     setBookingStep('submitting');
 
-    // Create booking request object
     const bookingRequest: StudentBookingRequest = {
       trainerId: selectedTrainer._id,
       requestedTime: new Date(`${selectedDate}T${selectedTime}`),
-      learningGoals: learningGoals.trim()
+      learningGoals: learningGoals.trim(),
     };
 
     try {
@@ -46,8 +45,8 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
         onSuccess();
       }, 2000);
     } catch (err) {
-      console.error('Booking failed:', err);
-      setBookingStep('select');
+      setSubmitError(err instanceof Error ? err.message : 'Booking failed. Please try again.');
+      setBookingStep('confirm');
     }
   };
 
@@ -58,16 +57,17 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
   };
 
   const canProceed = selectedTrainer && selectedDate && selectedTime && learningGoals.trim();
+  const displayError = submitError || error;
 
   if (bookingStep === 'submitting') {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg max-w-md w-full mx-4 p-8 text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-[32px] max-w-md w-full p-8 text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Booking Orientation Session</h3>
-          <p className="text-gray-500">Please wait while we book your session...</p>
+          <h3 className="text-lg font-playfair font-semibold text-slate-900 mb-2">Booking Orientation Session</h3>
+          <p className="text-slate-500 font-light">Please wait while we submit your request...</p>
         </div>
       </div>
     );
@@ -75,23 +75,36 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
 
   if (bookingStep === 'success') {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg max-w-md w-full mx-4 p-8">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-[32px] max-w-md w-full p-8">
           <div className="text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Session Booked Successfully!</h3>
-            <p className="text-gray-500 mb-4">Your orientation session has been scheduled</p>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-left">
+            <h3 className="text-lg font-playfair font-semibold text-slate-900 mb-2">Request Submitted!</h3>
+            <p className="text-slate-500 font-light mb-4">
+              Your mentor will review and confirm your orientation session.
+            </p>
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-left">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-700">Trainer: {selectedTrainer?.firstName} {selectedTrainer?.lastName}</span>
+                  <span className="text-sm text-green-700">
+                    Trainer: {selectedTrainer?.firstName} {selectedTrainer?.lastName}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-green-600" />
-                  <span className="text-sm text-green-700">Date: {selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
+                  <span className="text-sm text-green-700">
+                    Date:{' '}
+                    {selectedDate
+                      ? new Date(selectedDate).toLocaleDateString('en-US', {
+                          weekday: 'short',
+                          month: 'short',
+                          day: 'numeric',
+                        })
+                      : ''}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Clock className="w-4 h-4 text-green-600" />
@@ -101,7 +114,7 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
             </div>
             <button
               onClick={onSuccess}
-              className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors mt-6"
+              className="w-full bg-slate-900 text-white py-3 rounded-full font-medium hover:bg-slate-800 transition-colors mt-6"
             >
               Continue
             </button>
@@ -112,126 +125,123 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Book Orientation Session</h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-slate-100">
+          <div>
+            <h2 className="text-xl font-playfair font-semibold text-slate-900">Book Orientation Session</h2>
+            <p className="text-sm text-slate-500 font-light mt-1">Choose a mentor and preferred time</p>
+          </div>
+          <button onClick={handleClose} className="text-slate-400 hover:text-slate-600">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
+          {displayError && (
+            <div className="mb-6 flex items-start gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{displayError}</span>
+            </div>
+          )}
+
           {bookingStep === 'select' && (
             <div className="space-y-6">
-              {/* Step 1: Select Mentor */}
               <div>
-                <h3 className="font-medium text-gray-900 mb-4">Choose Your Mentor</h3>
+                <h3 className="font-medium text-slate-900 mb-4">Choose Your Mentor</h3>
                 {trainers.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-500">No available trainers at this time. Booking cannot continue.</p>
+                  <div className="text-center py-8 rounded-2xl bg-slate-50 border border-slate-100">
+                    <p className="text-slate-500 font-light">No available trainers at this time.</p>
                   </div>
                 ) : (
                   <div className="space-y-3 max-h-96 overflow-y-auto">
                     {trainers.map((trainer) => (
-                      <div
+                      <button
+                        type="button"
                         key={trainer._id}
-                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                        className={`w-full text-left p-4 border rounded-2xl transition-colors ${
                           selectedTrainer?._id === trainer._id
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                            ? 'border-primary bg-primary/5'
+                            : 'border-slate-100 hover:border-slate-200'
                         }`}
                         onClick={() => setSelectedTrainer(trainer)}
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center">
-                            <User className="w-6 h-6 text-gray-400" />
+                          <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                            <User className="w-6 h-6 text-slate-400" />
                           </div>
                           <div className="flex-1">
-                            <h4 className="font-medium text-gray-900">{trainer.firstName} {trainer.lastName}</h4>
-                            <p className="text-sm text-gray-500">{trainer.experience.yearsOfExperience} years experience</p>
-                            <p className="text-sm text-gray-500">Specializations: {trainer.experience.specializations.join(', ')}</p>
-                            <p className="text-sm text-gray-500">Skills: {trainer.skills.join(', ')}</p>
+                            <h4 className="font-medium text-slate-900">
+                              {trainer.firstName} {trainer.lastName}
+                            </h4>
+                            <p className="text-sm text-slate-500">
+                              {trainer.experience.yearsOfExperience} years experience
+                            </p>
+                            <p className="text-sm text-slate-500">
+                              Specializations: {trainer.experience.specializations.join(', ')}
+                            </p>
                           </div>
                           {selectedTrainer?._id === trainer._id && (
-                            <CheckCircle className="w-5 h-5 text-blue-600" />
+                            <CheckCircle className="w-5 h-5 text-primary" />
                           )}
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Step 2: Select Date - Use date picker */}
               {selectedTrainer && (
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Select Date</h3>
+                  <h3 className="font-medium text-slate-900 mb-3">Select Date</h3>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none"
                   />
-                  {selectedDate && (
-                    <p className="text-sm text-green-600 mt-2">Date selected: {selectedDate}</p>
-                  )}
                 </div>
               )}
 
-              {/* Step 3: Select Time - Use time picker */}
               {selectedTrainer && selectedDate && (
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Select Time</h3>
+                  <h3 className="font-medium text-slate-900 mb-3">Select Time</h3>
                   <input
                     type="time"
                     value={selectedTime}
                     onChange={(e) => setSelectedTime(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none"
                   />
-                  {selectedTime && (
-                    <p className="text-sm text-green-600 mt-2">Time selected: {selectedTime}</p>
-                  )}
                 </div>
               )}
 
-              {/* Step 4: Learning Goals */}
               {selectedTrainer && selectedDate && selectedTime && (
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-3">Your Learning Goals</h3>
+                  <h3 className="font-medium text-slate-900 mb-3">Your Learning Goals</h3>
                   <textarea
                     value={learningGoals}
                     onChange={(e) => setLearningGoals(e.target.value)}
                     placeholder="Tell your mentor what you want to learn and achieve..."
                     rows={4}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none resize-none"
                   />
-                  <p className="text-sm text-gray-500 mt-1">
-                    This helps your mentor prepare for your session
-                  </p>
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
                   onClick={handleClose}
-                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-full font-medium hover:bg-slate-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => setBookingStep('confirm')}
                   disabled={!canProceed}
-                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-3 bg-slate-900 text-white rounded-full font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Continue to Confirmation
+                  Continue
                 </button>
               </div>
             </div>
@@ -239,42 +249,44 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
 
           {bookingStep === 'confirm' && (
             <div className="space-y-6">
-              <h3 className="font-medium text-gray-900">Confirm Your Booking</h3>
+              <h3 className="font-medium text-slate-900">Confirm Your Booking</h3>
 
-              {/* Booking Summary */}
-              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
                 <div className="space-y-3">
                   <div className="flex items-start gap-3">
-                    <User className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <User className="w-5 h-5 text-slate-400 mt-0.5" />
                     <div>
-                      <p className="font-medium text-gray-900">Trainer</p>
-                      <p className="text-sm text-gray-600">{selectedTrainer?.firstName}</p>
-                      <p className="text-sm text-gray-500">{selectedTrainer?.experience.specializations}</p>
+                      <p className="font-medium text-slate-900">Trainer</p>
+                      <p className="text-sm text-slate-600">
+                        {selectedTrainer?.firstName} {selectedTrainer?.lastName}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <Calendar className="w-5 h-5 text-slate-400 mt-0.5" />
                     <div>
-                      <p className="font-medium text-gray-900">Date & Time</p>
-                      <p className="text-sm text-gray-600">{selectedDate} at {selectedTime}</p>
+                      <p className="font-medium text-slate-900">Date & Time</p>
+                      <p className="text-sm text-slate-600">
+                        {selectedDate} at {selectedTime}
+                      </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <MessageSquare className="w-5 h-5 text-gray-400 mt-0.5" />
+                    <MessageSquare className="w-5 h-5 text-slate-400 mt-0.5" />
                     <div>
-                      <p className="font-medium text-gray-900">Learning Goals</p>
-                      <p className="text-sm text-gray-600">{learningGoals}</p>
+                      <p className="font-medium text-slate-900">Learning Goals</p>
+                      <p className="text-sm text-slate-600">{learningGoals}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-700">
-                    <strong>Important:</strong> Your mentor will review your request and confirm the session. You'll receive a notification once confirmed.
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4">
+                  <p className="text-sm text-slate-700 font-light">
+                    Your mentor will review this request and confirm the session. You can track the status under Sessions & Calendar.
                   </p>
                 </div>
 
@@ -282,16 +294,16 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
                   <button
                     type="button"
                     onClick={() => setBookingStep('select')}
-                    className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-3 border border-slate-200 text-slate-700 rounded-full font-medium hover:bg-slate-50 transition-colors"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-3 bg-slate-900 text-white rounded-full font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isLoading ? 'Creating Booking...' : 'Book Session'}
+                    {isLoading ? 'Submitting...' : 'Submit Request'}
                   </button>
                 </div>
               </form>

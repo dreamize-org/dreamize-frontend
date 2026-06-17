@@ -3,8 +3,7 @@
 import { useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useBooking } from '@/contexts/BookingContext';
-import { useUsers } from '@/contexts';
-import { BookingStatus, TrainerApprovalRequest } from '@/types/booking';
+import { BookingStatus, TrainerApprovalRequest, Booking } from '@/types/booking';
 import { UserRole } from '@/types/user';
 import { Calendar, Clock, User, MessageSquare, CheckCircle, XCircle, AlertCircle, Filter, Search, RefreshCw, Video, MapPin, FileText } from 'lucide-react';
 
@@ -18,7 +17,6 @@ export default function TrainerBookingsPage() {
     rejectBooking, 
     refreshBookings 
   } = useBooking();
-  const { students } = useUsers();
   
   const [activeTab, setActiveTab] = useState<'pending' | 'all'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,15 +37,10 @@ export default function TrainerBookingsPage() {
     nextSteps: ''
   });
 
-  const getStudentName = (studentId: string) => {
-    const student = students.find(s => s._id === studentId);
-    return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
-  };
+  const getStudentName = (student: Booking['student']) =>
+    `${student.firstName} ${student.lastName}`.trim() || 'Unknown Student';
 
-  const getStudentEmail = (studentId: string) => {
-    const student = students.find(s => s._id === studentId);
-    return student?.email || 'unknown@example.com';
-  };
+  const getStudentEmail = (student: Booking['student']) => student.email || 'unknown@example.com';
 
   const handleApprove = async (bookingId: string) => {
     setApprovingBooking(bookingId);
@@ -113,8 +106,8 @@ export default function TrainerBookingsPage() {
   };
 
   const filteredBookings = (activeTab === 'pending' ? trainerPendingBookings : trainerAllBookings).filter(booking => {
-    const matchesSearch = getStudentName(booking.student._id).toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         getStudentEmail(booking.student._id).toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = getStudentName(booking.student).toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         getStudentEmail(booking.student).toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -287,8 +280,8 @@ export default function TrainerBookingsPage() {
                           <User className="w-5 h-5 text-primary" />
                         </div>
                         <div>
-                          <h3 className="font-medium text-slate-900">{getStudentName(booking.student._id)}</h3>
-                          <p className="text-sm text-slate-500">{getStudentEmail(booking.student._id)}</p>
+                          <h3 className="font-medium text-slate-900">{getStudentName(booking.student)}</h3>
+                          <p className="text-sm text-slate-500">{getStudentEmail(booking.student)}</p>
                         </div>
                       </div>
 

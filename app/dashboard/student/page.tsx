@@ -7,10 +7,12 @@ import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { OnboardingChecklist, UserRole } from '@/types';
 import BookingCalendar from '@/components/booking/BookingCalendar';
 import Sidebar from '@/components/dashboard/Sidebar';
+import { useBooking } from '@/contexts/BookingContext';
 
 export default function StudentDashboard() {
   const { user, isAuthenticated, isLoading: authLoading, onboardingChecklist } = useAuth();
   const { navigate } = useNavigationWithLoading();
+  const { refreshBookings } = useBooking();
 
   // Modal states
   const [showBookingCalendar, setShowBookingCalendar] = useState(false);
@@ -331,7 +333,10 @@ export default function StudentDashboard() {
       {showBookingCalendar && (
         <BookingCalendar
           onClose={() => setShowBookingCalendar(false)}
-          onSuccess={() => setShowBookingCalendar(false)}
+          onSuccess={() => {
+            setShowBookingCalendar(false);
+            refreshBookings();
+          }}
         />
       )}
     </div>

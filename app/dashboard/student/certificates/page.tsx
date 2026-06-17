@@ -1,9 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from '@/hooks/useRouter';
+import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { UserRole } from '@/types';
 import { certificateService } from '@/services/certificates';
 import type { CertificateRecord } from '@/services/certificates';
@@ -38,10 +38,10 @@ async function openCertificateView(certificateId: string) {
 }
 
 export default function CertificatesPage() {
-  const { user, isAuthenticated, authStatus } = useAuth();
-  const router = useRouter();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { navigate } = useNavigationWithLoading();
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
 
@@ -49,35 +49,36 @@ export default function CertificatesPage() {
     user && 'hasActiveSubscription' in user && user.hasActiveSubscription
   );
 
+  const loadCertificates = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await certificateService.getMyCertificates();
+      if (response.success && response.data) {
+        setCertificates(response.data);
+      } else {
+        setCertificates([]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load certificates');
+      setCertificates([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (authStatus === 'loading') return;
+    if (authLoading) return;
+
     if (!isAuthenticated || user?.role !== UserRole.STUDENT) {
-      router.push('/auth/login');
+      navigate('/auth/login');
       return;
     }
 
-    const loadCertificates = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const response = await certificateService.getMyCertificates();
-        if (response.success && response.data) {
-          setCertificates(response.data);
-        } else {
-          setCertificates([]);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load certificates');
-        setCertificates([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadCertificates();
-  }, [authStatus, isAuthenticated, router, user?.role]);
+  }, [authLoading, isAuthenticated, user?.role, loadCertificates, navigate]);
 
-  if (authStatus === 'loading' || loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FDF9F2]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -108,7 +109,7 @@ export default function CertificatesPage() {
                   Complete milestones with an active subscription to earn downloadable certificates.
                 </p>
                 <button
-                  onClick={() => router.push('/dashboard/student/pay/subscription')}
+                  onClick={() => navigate('/dashboard/student/pay/subscription')}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors"
                 >
                   <CreditCard className="w-5 h-5" />
@@ -155,7 +156,7 @@ export default function CertificatesPage() {
                   Complete milestones and get them approved by your trainer to earn certificates.
                 </p>
                 <button
-                  onClick={() => router.push('/dashboard/student/roadmap')}
+                  onClick={() => navigate('/dashboard/student/roadmap')}
                   className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors"
                 >
                   <CheckCircle className="w-5 h-5" />
