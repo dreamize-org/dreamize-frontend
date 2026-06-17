@@ -5,7 +5,8 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import { useProjects } from '@/contexts/ProjectContext';
 import { useUsers } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { projectService } from '@/services/project';
+import { useRoadmaps } from '@/contexts';
+import { projectService, getProjectStudentId } from '@/services/project';
 import { getAuthUserId, normalizeId } from '@/lib/auth/session';
 import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { UserRole, ProjectStatus, type Project } from '@/types';
@@ -37,6 +38,7 @@ export default function TrainerProjectsPage() {
   const { user } = useAuth();
   const { students } = useUsers();
   const { projects, refreshProjects } = useProjects();
+  const { refreshRoadmaps } = useRoadmaps();
   
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,13 +46,16 @@ export default function TrainerProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [trainerFeedback, setTrainerFeedback] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   // Filter projects for trainer's students
   const trainerStudentIds = filterStudentsForTrainer(students, getAuthUserId(user)).map((student) =>
     normalizeId(student._id)
   );
   
-  const trainerProjects = projects.filter(p => trainerStudentIds.includes(p.student._id));
+  const trainerProjects = projects.filter((project) =>
+    trainerStudentIds.includes(getProjectStudentId(project))
+  );
 
   // Apply filters
   const filteredProjects = trainerProjects.filter(project => {
@@ -110,21 +115,23 @@ export default function TrainerProjectsPage() {
     }
   };
 
-  const getStudentName = (studentId: string) => {
-    const student = students.find(s => s._id === studentId);
+  const getStudentName = (project: Project) => {
+    const studentId = getProjectStudentId(project);
+    const student = students.find((s) => s._id === studentId);
     return student ? `${student.firstName} ${student.lastName}` : 'Unknown Student';
   };
 
   const handleApprove = async () => {
     if (!selectedProject) return;
     setIsProcessing(true);
+    setActionError('');
     try {
       await projectService.approveProject(selectedProject.id, trainerFeedback);
-      await refreshProjects();
+      await Promise.all([refreshProjects(), refreshRoadmaps()]);
       setSelectedProject(null);
       setTrainerFeedback('');
     } catch (error) {
-      console.error('Failed to approve project:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to approve project.');
     } finally {
       setIsProcessing(false);
     }
@@ -133,13 +140,14 @@ export default function TrainerProjectsPage() {
   const handleReject = async () => {
     if (!selectedProject || !trainerFeedback.trim()) return;
     setIsProcessing(true);
+    setActionError('');
     try {
       await projectService.rejectProject(selectedProject.id, trainerFeedback);
-      await refreshProjects();
+      await Promise.all([refreshProjects(), refreshRoadmaps()]);
       setSelectedProject(null);
       setTrainerFeedback('');
     } catch (error) {
-      console.error('Failed to reject project:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to reject project.');
     } finally {
       setIsProcessing(false);
     }
@@ -243,7 +251,7 @@ export default function TrainerProjectsPage() {
                 {filteredProjects.map((project) => (
                   <div
                     key={project.id}
-                    onClick={() => { setSelectedProject(project); setTrainerFeedback(project.trainerFeedback || ''); }}
+                    onClick={() => { setSelectedProject(project); setTrainerFeedback(project.trainerFeedback || ''); setActionError(''); }}
                     className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all cursor-pointer group"
                   >
                     {/* Header */}
@@ -267,7 +275,7 @@ export default function TrainerProjectsPage() {
                         <User className="w-4 h-4 text-primary" />
                       </div>
                       <span className="text-sm font-medium text-slate-700">
-                        {getStudentName(project.student._id)}
+                        {getStudentName(project)}
                       </span>
                     </div>
 
@@ -328,7 +336,7 @@ export default function TrainerProjectsPage() {
                     {filteredProjects.map((project) => (
                       <tr
                         key={project.id}
-                        onClick={() => { setSelectedProject(project); setTrainerFeedback(project.trainerFeedback || ''); }}
+                        onClick={() => { setSelectedProject(project); setTrainerFeedback(project.trainerFeedback || ''); setActionError(''); }}
                         className="hover:bg-slate-50 cursor-pointer transition-colors"
                       >
                         <td className="px-6 py-4">
@@ -338,7 +346,7 @@ export default function TrainerProjectsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="text-sm text-slate-700">{getStudentName(project.student._id)}</span>
+                          <span className="text-sm text-slate-700">{getStudentName(project)}</span>
                         </td>
                         <td className="px-6 py-4">
                           <span className="text-sm text-slate-700">{project.category}</span>
@@ -398,7 +406,7 @@ export default function TrainerProjectsPage() {
                 <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
                   <span className="flex items-center gap-1">
                     <User className="w-4 h-4" />
-                    {getStudentName(selectedProject.student._id)}
+                    {getStudentName(selectedProject)}
                   </span>
                   <span className="flex items-center gap-1">
                     <Target className="w-4 h-4" />
@@ -411,7 +419,7 @@ export default function TrainerProjectsPage() {
                 </div>
               </div>
               <button
-                onClick={() => { setSelectedProject(null); setTrainerFeedback(''); }}
+                onClick={() => { setSelectedProject(null); setTrainerFeedback(''); setActionError(''); }}
                 className="p-2 hover:bg-slate-50 rounded-xl transition-colors"
               >
                 <XCircle className="w-5 h-5 text-slate-400" />
@@ -565,8 +573,12 @@ export default function TrainerProjectsPage() {
                 </h3>
                 
                 {(selectedProject.status as string) === 'pending_approval' ? (
-                  // Input for pending projects
                   <>
+                    {selectedProject.milestoneId && (
+                      <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
+                        This project is linked to a roadmap milestone. Approve the project here, then finish the milestone from Student Roadmaps once every submitted project is approved.
+                      </div>
+                    )}
                     <textarea
                       value={trainerFeedback}
                       onChange={(e) => setTrainerFeedback(e.target.value)}
@@ -575,10 +587,14 @@ export default function TrainerProjectsPage() {
                       className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none resize-none"
                     />
                     
+                    {actionError && (
+                      <p className="mt-3 text-sm text-red-600">{actionError}</p>
+                    )}
+
                     {/* Approval Actions */}
                     <div className="flex gap-3 mt-4">
                       <button
-                        onClick={() => { setSelectedProject(null); setTrainerFeedback(''); }}
+                        onClick={() => { setSelectedProject(null); setTrainerFeedback(''); setActionError(''); }}
                         className="flex-1 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors"
                       >
                         Cancel

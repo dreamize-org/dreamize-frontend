@@ -134,11 +134,8 @@ function CreatePageContent() {
       return;
     }
 
-    if (
-      selectedMilestone.status !== RoadmapStepStatus.ACTIVE &&
-      selectedMilestone.status !== RoadmapStepStatus.LOCKED
-    ) {
-      setSubmitError('You can only submit projects for active milestones.');
+    if (selectedMilestone.status !== RoadmapStepStatus.ACTIVE) {
+      setSubmitError('You can only submit projects for the active milestone on your roadmap.');
       return;
     }
 
@@ -176,7 +173,7 @@ function CreatePageContent() {
   };
 
   const canSelectMilestone = (status: RoadmapStepStatus) =>
-    status === RoadmapStepStatus.ACTIVE || status === RoadmapStepStatus.LOCKED;
+    status === RoadmapStepStatus.ACTIVE;
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-gradient-to-br from-blue-50/20 via-[#fafaf7] to-[#FDF9F2] overflow-hidden">
@@ -316,7 +313,7 @@ function CreatePageContent() {
                             key={milestone.order}
                             onClick={() => {
                               if (!canSelectMilestone(milestone.status)) {
-                                setSubmitError('This milestone is not open for submission yet.');
+                                setSubmitError('Only the active milestone is open for submission.');
                                 return;
                               }
                               setSubmitError('');

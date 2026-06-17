@@ -37,6 +37,7 @@ export default function TrainerRoadmapsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionError, setActionError] = useState('');
   const [milestoneProjects, setMilestoneProjects] = useState<Project[]>([]);
+  const [loadingMilestoneProjects, setLoadingMilestoneProjects] = useState(false);
   const [viewingProjectDetail, setViewingProjectDetail] = useState<Project | null>(null);
 
   // Filter roadmaps for current trainer
@@ -135,26 +136,37 @@ export default function TrainerRoadmapsPage() {
     setSelectedMilestone(null);
   };
 
+  const loadMilestoneProjects = async (milestone: Milestone) => {
+    if (!milestone.submittedProjectIds?.length) {
+      setMilestoneProjects([]);
+      return [];
+    }
+
+    setLoadingMilestoneProjects(true);
+    try {
+      const projects: Project[] = [];
+      for (const projectId of milestone.submittedProjectIds) {
+        const response = await projectService.getProjectData(projectId);
+        if (response.data) {
+          projects.push(response.data);
+        }
+      }
+      setMilestoneProjects(projects);
+      return projects;
+    } catch {
+      setMilestoneProjects([]);
+      return [];
+    } finally {
+      setLoadingMilestoneProjects(false);
+    }
+  };
+
   const handleViewMilestoneDetails = async (milestone: Milestone) => {
     setSelectedMilestone(milestone);
     setTrainerFeedback(milestone.trainerFeedback || '');
-    
-    // Load projects for this milestone
-    if (milestone.submittedProjectIds?.length) {
-      try {
-        const projects: Project[] = [];
-        for (const projectId of milestone.submittedProjectIds) {
-          const response = await projectService.getProjectData(projectId);
-          if (response.data) projects.push(response.data);
-        }
-        setMilestoneProjects(projects);
-      } catch {
-        setMilestoneProjects([]);
-      }
-    } else {
-      setMilestoneProjects([]);
-    }
-    
+    setActionError('');
+    setViewingProjectDetail(null);
+    await loadMilestoneProjects(milestone);
     setShowApprovalModal(true);
   };
 
@@ -205,12 +217,81 @@ export default function TrainerRoadmapsPage() {
   };
 
   const allProjectsApproved = () => {
-    if (!milestoneProjects.length) return true;
-    return milestoneProjects.every(p => p.status === ProjectStatus.APPROVED);
+    const submittedCount = selectedMilestone?.submittedProjectIds?.length ?? 0;
+    if (submittedCount === 0) {
+      return false;
+    }
+    if (loadingMilestoneProjects || milestoneProjects.length === 0) {
+      return false;
+    }
+    return milestoneProjects.every((project) => project.status === ProjectStatus.APPROVED);
   };
 
-  const pendingProjectsCount = () => {
-    return milestoneProjects.filter(p => p.status === ProjectStatus.PENDING_APPROVAL).length;
+  const pendingProjectsCount = () =>
+    milestoneProjects.filter((project) => project.status === ProjectStatus.PENDING_APPROVAL).length;
+
+  const handleApproveProject = async (projectId: string, feedback?: string) => {
+    setIsProcessing(true);
+    setActionError('');
+    try {
+      await projectService.approveProject(projectId, feedback ?? trainerFeedback);
+      if (selectedMilestone) {
+        await loadMilestoneProjects(selectedMilestone);
+      }
+      if (selectedRoadmap) {
+        await refreshRoadmaps();
+        await syncSelectedRoadmap(selectedRoadmap.id);
+      }
+      const updated = await projectService.getProjectData(projectId);
+      if (updated.data && viewingProjectDetail?.id === projectId) {
+        setViewingProjectDetail(updated.data);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to approve project.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRejectProject = async (projectId: string, feedback?: string) => {
+    const resolvedFeedback = (feedback ?? trainerFeedback).trim();
+    if (!resolvedFeedback) {
+      setActionError('Feedback is required when rejecting a project.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setActionError('');
+    const milestoneOrder = selectedMilestone?.order;
+    try {
+      await projectService.rejectProject(projectId, resolvedFeedback);
+      if (selectedMilestone) {
+        await loadMilestoneProjects(selectedMilestone);
+      }
+      if (selectedRoadmap && milestoneOrder != null) {
+        await refreshRoadmaps();
+        await syncSelectedRoadmap(selectedRoadmap.id);
+        const latest = await roadmapService.getRoadmaps();
+        const refreshedRoadmap = latest?.find((roadmap) => roadmap.id === selectedRoadmap.id);
+        if (refreshedRoadmap) {
+          setSelectedRoadmap(refreshedRoadmap);
+          const refreshedMilestone = refreshedRoadmap.milestones?.find(
+            (milestone) => milestone.order === milestoneOrder
+          );
+          if (refreshedMilestone) {
+            setSelectedMilestone(refreshedMilestone);
+          }
+        }
+      }
+      const updated = await projectService.getProjectData(projectId);
+      if (updated.data && viewingProjectDetail?.id === projectId) {
+        setViewingProjectDetail(updated.data);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to reject project.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleMilestoneLockToggle = async (milestone: Milestone, locked: boolean) => {
@@ -459,7 +540,7 @@ export default function TrainerRoadmapsPage() {
                       const isActive = milestone.status === RoadmapStepStatus.ACTIVE;
                       const isCompleted = milestone.status === RoadmapStepStatus.COMPLETED;
                       const isPending = milestone.status === RoadmapStepStatus.PENDING_APPROVAL;
-                      const pendingProjects = milestone.submittedProjectIds?.length || 0;
+                      const submittedProjectsCount = milestone.submittedProjectIds?.length || 0;
                       
                       return (
                         <div key={index} className="relative flex gap-4">
@@ -509,9 +590,9 @@ export default function TrainerRoadmapsPage() {
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getMilestoneStatusColor(milestone.status)}`}>
                                       {getMilestoneStatusLabel(milestone.status)}
                                     </span>
-                                    {pendingProjects > 0 && (
+                                    {isPending && submittedProjectsCount > 0 && (
                                       <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
-                                        {pendingProjects} project{pendingProjects > 1 ? 's' : ''} to review
+                                        {submittedProjectsCount} submission{submittedProjectsCount > 1 ? 's' : ''}
                                       </span>
                                     )}
                                   </div>
@@ -707,45 +788,13 @@ export default function TrainerRoadmapsPage() {
                                 </div>
                               </div>
                               <div className="flex flex-col gap-2">
-                                {/* View Details Button */}
                                 <button
                                   onClick={() => setViewingProjectDetail(project)}
                                   className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium flex items-center gap-1.5"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
-                                  View Details
+                                  Review Project
                                 </button>
-                                {/* Quick Approve/Reject */}
-                                {project.status === ProjectStatus.PENDING_APPROVAL && (
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={async () => {
-                                        await projectService.approveProject(project.id);
-                                        const updated = await projectService.getProjectData(project.id);
-                                        if (updated.data) {
-                                          setMilestoneProjects(prev => prev.map(p => p.id === project.id ? updated.data! : p));
-                                        }
-                                      }}
-                                      className="flex-1 p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                                      title="Approve"
-                                    >
-                                      <ThumbsUp className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        await projectService.rejectProject(project.id);
-                                        const updated = await projectService.getProjectData(project.id);
-                                        if (updated.data) {
-                                          setMilestoneProjects(prev => prev.map(p => p.id === project.id ? updated.data! : p));
-                                        }
-                                      }}
-                                      className="flex-1 p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                                      title="Reject"
-                                    >
-                                      <ThumbsDown className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -757,8 +806,14 @@ export default function TrainerRoadmapsPage() {
                         <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
                           <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                           <p className="text-sm text-orange-700">
-                            <span className="font-medium">Action Required:</span> {pendingProjectsCount()} project(s) need approval before you can approve this milestone.
+                            <span className="font-medium">Step 1:</span> Review and approve each submitted project below.{' '}
+                            <span className="font-medium">Step 2:</span> Once all projects are approved, use Approve Milestone.
                           </p>
+                        </div>
+                      )}
+                      {loadingMilestoneProjects && (
+                        <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+                          Loading submitted projects...
                         </div>
                       )}
                     </div>
@@ -814,6 +869,7 @@ export default function TrainerRoadmapsPage() {
                     <button
                       onClick={handleApproveMilestone}
                       disabled={isProcessing || !allProjectsApproved()}
+                      title={!allProjectsApproved() ? 'Approve all submitted projects first' : undefined}
                       className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       <CheckSquare className="w-4 h-4" />
@@ -1044,29 +1100,15 @@ export default function TrainerRoadmapsPage() {
                   {viewingProjectDetail.status === ProjectStatus.PENDING_APPROVAL && (
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <button
-                        onClick={async () => {
-                          await projectService.rejectProject(viewingProjectDetail.id, trainerFeedback);
-                          const updated = await projectService.getProjectData(viewingProjectDetail.id);
-                          if (updated.data) {
-                            setMilestoneProjects(prev => prev.map(p => p.id === viewingProjectDetail.id ? updated.data! : p));
-                            setViewingProjectDetail(updated.data);
-                          }
-                        }}
-                        disabled={isProcessing}
+                        onClick={() => handleRejectProject(viewingProjectDetail.id)}
+                        disabled={isProcessing || !trainerFeedback.trim()}
                         className="flex-1 px-4 py-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                       >
                         <ThumbsDown className="w-4 h-4" />
                         Reject Project
                       </button>
                       <button
-                        onClick={async () => {
-                          await projectService.approveProject(viewingProjectDetail.id, trainerFeedback);
-                          const updated = await projectService.getProjectData(viewingProjectDetail.id);
-                          if (updated.data) {
-                            setMilestoneProjects(prev => prev.map(p => p.id === viewingProjectDetail.id ? updated.data! : p));
-                            setViewingProjectDetail(updated.data);
-                          }
-                        }}
+                        onClick={() => handleApproveProject(viewingProjectDetail.id)}
                         disabled={isProcessing}
                         className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                       >
