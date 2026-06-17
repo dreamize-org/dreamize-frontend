@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { commaListsMatch, formatCommaList, parseCommaList } from '@/lib/forms/commaList';
 
 interface CommaSeparatedInputProps
@@ -15,17 +15,16 @@ export function CommaSeparatedInput({
   className,
   ...props
 }: CommaSeparatedInputProps) {
-  const [text, setText] = useState(() => formatCommaList(value));
-  const valueKey = value.join('\u0000');
+  const serializedValue = formatCommaList(value);
+  const [text, setText] = useState(serializedValue);
+  const [lastSerializedValue, setLastSerializedValue] = useState(serializedValue);
 
-  useEffect(() => {
-    setText((current) => {
-      if (commaListsMatch(current, value)) {
-        return current;
-      }
-      return formatCommaList(value);
-    });
-  }, [valueKey]);
+  if (serializedValue !== lastSerializedValue) {
+    setLastSerializedValue(serializedValue);
+    if (!commaListsMatch(text, value)) {
+      setText(serializedValue);
+    }
+  }
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextText = event.target.value;

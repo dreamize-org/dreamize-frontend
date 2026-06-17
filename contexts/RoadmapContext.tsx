@@ -42,9 +42,7 @@ export const RoadmapProvider = ({ children }: { children: React.ReactNode }) => 
         try {
             setError(null);
             const newRoadmap = await roadmapService.createRoadmap(data);
-            if (newRoadmap) {
-                setRoadmaps(prev => [...prev, newRoadmap]);
-            }
+            await fetchRoadmaps();
             return newRoadmap!;
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to create roadmap');
