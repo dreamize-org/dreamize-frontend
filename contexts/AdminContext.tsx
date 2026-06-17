@@ -79,6 +79,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [ticketsError, setTicketsError] = useState<string | null>(null);
 
+  const adminUserId = user?._id;
   const isAdmin = user?.role === 'admin';
 
   const refreshUsers = async () => {
@@ -165,14 +166,14 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!isAdmin || !adminUserId) return;
     refreshUsers();
     refreshTrainers();
     refreshPayments();
     refreshAnalytics();
     refreshTickets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [adminUserId, isAdmin]);
 
   return (
     <AdminContext.Provider value={{

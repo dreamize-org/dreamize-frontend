@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { authService } from '@/services/auth';
 import { apiClient } from '@/services/client';
 import { BaseUser, OnboardingChecklist, StudentRegister, Trainer, UserRole, Guardian, GuardianInviteState, ProfileUpdate } from '@/types';
@@ -98,7 +98,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       localStorage.setItem('auth_token', token);
     }
-    setUser(userData);
+    setUser((prev) => {
+      if (prev && JSON.stringify(prev) === JSON.stringify(userData)) {
+        return prev;
+      }
+      return userData;
+    });
   }, []);
 
   const clearRegistrationDraft = useCallback(() => {
@@ -203,28 +208,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrap();
   }, [syncSessionUser]);
 
-  const fetchOnboardingChecklist = async () => {
-    if (user && user.role === UserRole.STUDENT && user.isVerified) {
-      try {
-        const currentStudent = await userService.getStudent();
-        if (currentStudent.success && currentStudent.data) {
-          persistSession(currentStudent.data);
-        }
-        const response = await authService.getOnboardingChecklist();
-        if (response.success && response.data) {
-          setOnboardingChecklist(response.data);
-        }
-      } catch {
-        // Silently fail - not critical
-      }
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const fetchOnboardingChecklist = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser || currentUser.role !== UserRole.STUDENT || !currentUser.isVerified) {
+      return;
     }
-  };
+
+    try {
+      const currentStudent = await userService.getStudent();
+      if (currentStudent.success && currentStudent.data) {
+        persistSession(currentStudent.data);
+      }
+      const response = await authService.getOnboardingChecklist();
+      if (response.success && response.data) {
+        setOnboardingChecklist((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(response.data)) {
+            return prev;
+          }
+          return response.data!;
+        });
+      }
+    } catch {
+      // Silently fail - not critical
+    }
+  }, [persistSession]);
 
   useEffect(() => {
-    if (user?._id && user.isVerified) {
+    if (user?._id && user.isVerified && user.role === UserRole.STUDENT) {
       fetchOnboardingChecklist();
     }
-  }, [user?._id, user?.isVerified]);
+  }, [user?._id, user?.isVerified, user?.role, fetchOnboardingChecklist]);
 
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);

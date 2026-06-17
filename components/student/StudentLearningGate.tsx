@@ -17,7 +17,7 @@ export default function StudentLearningGate({ children }: { children: React.Reac
     if (authStatus === 'ready' && user?.role === 'student') {
       fetchOnboardingChecklist().catch(() => undefined);
     }
-  }, [authStatus, fetchOnboardingChecklist, pathname, user?.role]);
+  }, [authStatus, pathname, user?.role, user?._id, fetchOnboardingChecklist]);
 
   if (!requiresActiveSubscription(pathname)) {
     return <>{children}</>;

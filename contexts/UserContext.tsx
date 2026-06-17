@@ -46,14 +46,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 
 
+  const userId = currentUser?._id;
+  const userRole = currentUser?.role;
+  const shouldLoadDirectory =
+    Boolean(userId) &&
+    (userRole === UserRole.ADMIN || userRole === UserRole.TRAINER || userRole === UserRole.STUDENT);
+
   useEffect(() => {
-    if (currentUser) {
+    if (shouldLoadDirectory) {
       loadUsers();
     } else {
       setUsers([]);
+      setStudents([]);
+      setTrainers([]);
       setIsLoading(false);
     }
-  }, [currentUser]);
+  }, [shouldLoadDirectory, userId, userRole]);
 
 
   const getUsersByRole = (role: UserRole) => users.filter(u => u.role === role);
