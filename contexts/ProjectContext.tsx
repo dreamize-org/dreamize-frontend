@@ -2,7 +2,7 @@
 
 import { projectService } from "@/services/project";
 import { Project } from "@/types";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 interface ProjectContextType {
   projects: Project[];
@@ -18,7 +18,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -29,11 +29,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [loadProjects]);
 
   return (
     <ProjectContext.Provider value={{ projects, isLoading, error, refreshProjects: loadProjects }}>

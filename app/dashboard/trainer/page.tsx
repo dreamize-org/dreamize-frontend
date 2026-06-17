@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useRoadmaps, useUsers, useFinancial } from '@/contexts';
+import { useRoadmaps, useUsers, useFinancial } from '@/contexts';
 import { useBooking } from '@/contexts/BookingContext';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { getAuthUserId } from '@/lib/auth/session';
 import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { BookingStatus } from '@/types/booking';
@@ -29,30 +29,14 @@ import {
 import { UserRole } from '@/types';
 
 export default function TrainerDashboard() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole('trainer');
   const { studentRoadmaps, isLoading: roadmapsLoading } = useRoadmaps();
   const { students, isLoading: usersLoading } = useUsers();
   const { isLoading: financialLoading } = useFinancial();
   const { trainerAllBookings, trainerPendingBookings } = useBooking();
   const { navigate } = useNavigationWithLoading();
 
-  // Redirect if not authenticated or not a trainer
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'trainer') {
-      const dashboardRoutes: Record<string, string> = {
-        'student': '/dashboard/student',
-        'admin': '/dashboard/admin',
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
-
-  const isLoading = authLoading || roadmapsLoading || usersLoading || financialLoading;
+  const isLoading = authLoading || !isAuthorized || roadmapsLoading || usersLoading || financialLoading;
 
   if (isLoading) {
     return (

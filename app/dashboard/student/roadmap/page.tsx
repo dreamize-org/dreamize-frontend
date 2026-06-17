@@ -2,36 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useRoadmaps } from '@/contexts';
+import { useRoadmaps } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { Milestone, UserRole, RoadmapStepStatus, Roadmap, RoadmapStatus } from '@/types';
 import { Map, Clock, CheckCircle, Lock, PlayCircle, PauseCircle, XCircle, Target, BookOpen, ChevronRight, X, Link2, FileText, Image as ImageIcon, FilePlus, ExternalLink, Youtube, Figma, Github, Code, Briefcase, Layers, Plus, Trash2 } from 'lucide-react';
 
 export default function StudentRoadmapPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthorized, authLoading } = useRequireRole('student');
   const { studentRoadmaps, isLoading: roadmapsLoading, refreshRoadmaps } = useRoadmaps();
   const { navigate } = useNavigationWithLoading();
 
   const [selectedRoadmap, setSelectedRoadmap] = useState<Roadmap | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'detail'>('list');
 
-  // Redirect if not authenticated or not a student
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'student') {
-      const dashboardRoutes: Record<string, string> = {
-        'trainer': '/dashboard/trainer',
-        'admin': '/dashboard/admin'
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user]);
-
-  if (authLoading || roadmapsLoading) {
+  if (authLoading || roadmapsLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-white">
         <div className="w-64 bg-gray-900 animate-pulse"></div>

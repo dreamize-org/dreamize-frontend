@@ -1,17 +1,16 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { UserRole } from '@/types';
 import { certificateService } from '@/services/certificates';
 import type { CertificateRecord } from '@/services/certificates';
 import { BASE_URL } from '@/services/constants';
 import { API_ENDPOINTS } from '@/services/constants';
+import { useRequireRole } from '@/hooks/useRequireRole';
+import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import {
   Award,
-  CreditCard,
   Download,
   Calendar,
   CheckCircle,
@@ -38,45 +37,61 @@ async function openCertificateView(certificateId: string) {
 }
 
 export default function CertificatesPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole(UserRole.STUDENT);
   const { navigate } = useNavigationWithLoading();
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const loadedForUserRef = useRef<string | null>(null);
 
-  const hasActiveSubscription = Boolean(
-    user && 'hasActiveSubscription' in user && user.hasActiveSubscription
-  );
-
-  const loadCertificates = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await certificateService.getMyCertificates();
-      if (response.success && response.data) {
-        setCertificates(response.data);
-      } else {
-        setCertificates([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load certificates');
-      setCertificates([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const userId = user?._id;
 
   useEffect(() => {
-    if (authLoading) return;
-
-    if (!isAuthenticated || user?.role !== UserRole.STUDENT) {
-      navigate('/auth/login');
+    if (!isAuthorized || !userId) {
+      if (!authLoading) {
+        setLoading(false);
+      }
       return;
     }
 
+    if (loadedForUserRef.current === userId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCertificates = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const response = await certificateService.getMyCertificates();
+        if (cancelled) return;
+
+        if (response.success && response.data) {
+          setCertificates(response.data);
+        } else {
+          setCertificates([]);
+        }
+        loadedForUserRef.current = userId;
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load certificates');
+          setCertificates([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
     loadCertificates();
-  }, [authLoading, isAuthenticated, user?.role, loadCertificates, navigate]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, isAuthorized, userId]);
 
   if (authLoading || loading) {
     return (
@@ -86,41 +101,8 @@ export default function CertificatesPage() {
     );
   }
 
-  if (!user || user.role !== UserRole.STUDENT) {
+  if (!isAuthorized || !user || user.role !== UserRole.STUDENT) {
     return null;
-  }
-
-  const showSubscriptionUpsell = !hasActiveSubscription && certificates.length === 0;
-
-  if (showSubscriptionUpsell) {
-    return (
-      <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
-        <Sidebar activeItem="Certificates" userType={UserRole.STUDENT} />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-8">
-            <div className="max-w-4xl mx-auto">
-              <div className="mb-8">
-                <h1 className="text-3xl font-playfair font-semibold text-slate-900">My Certificates</h1>
-                <p className="text-slate-500 font-light mt-1">Download your milestone completion certificates</p>
-              </div>
-              <div className="bg-white rounded-[40px] border border-slate-100 p-12 text-center">
-                <h2 className="text-xl font-playfair font-semibold text-slate-900 mb-2">Certificates Locked</h2>
-                <p className="text-slate-500 font-light mb-6 max-w-md mx-auto">
-                  Complete milestones with an active subscription to earn downloadable certificates.
-                </p>
-                <button
-                  onClick={() => navigate('/dashboard/student/pay/subscription')}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-full hover:bg-slate-800 transition-colors"
-                >
-                  <CreditCard className="w-5 h-5" />
-                  Subscribe to Unlock
-                </button>
-              </div>
-            </div>
-          </main>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -133,11 +115,18 @@ export default function CertificatesPage() {
             <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-3xl font-playfair font-semibold text-slate-900">My Certificates</h1>
-                <p className="text-slate-500 font-light mt-1">Milestone completion certificates and achievements</p>
+                <p className="text-slate-500 font-light mt-1">
+                  Earned automatically when your trainer approves a completed milestone
+                </p>
               </div>
               <span className="text-sm text-slate-500">
                 {certificates.length} certificate{certificates.length !== 1 ? 's' : ''}
               </span>
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-slate-700">
+              Certificates are issued by the platform when a trainer approves your milestone submission.
+              You do not need an admin to create them manually.
             </div>
 
             {error && (
@@ -153,7 +142,8 @@ export default function CertificatesPage() {
                 </div>
                 <h2 className="text-xl font-playfair font-semibold text-slate-900 mb-2">No Certificates Yet</h2>
                 <p className="text-slate-500 font-light mb-6 max-w-md mx-auto">
-                  Complete milestones and get them approved by your trainer to earn certificates.
+                  Submit milestone evidence, get your project approved by your trainer, then approve the milestone.
+                  A certificate is generated automatically at that point.
                 </p>
                 <button
                   onClick={() => navigate('/dashboard/student/roadmap')}

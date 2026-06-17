@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useRoadmaps, useProjects } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { Milestone, UserRole, RoadmapStepStatus, Roadmap } from '@/types';
 import { roadmapService } from '@/services/roadmap';
 import { useSearchParams } from 'next/navigation';
@@ -16,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TagListInput } from '@/components/ui/TagListInput';
 
 function CreatePageContent() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthorized, authLoading } = useRequireRole('student');
   const { studentRoadmaps, isLoading: roadmapsLoading, refreshRoadmaps } = useRoadmaps();
   const { refreshProjects } = useProjects();
   const { navigate } = useNavigationWithLoading();
@@ -51,22 +52,6 @@ function CreatePageContent() {
   // Automatically find the active roadmap or the first roadmap
   const activeRoadmap = studentRoadmaps?.find(r => r.status === 'active' || r.status === 'pending-approval') || studentRoadmaps?.[0] || null;
 
-  // Redirect if not authenticated or not a student
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'student') {
-      const dashboardRoutes: Record<string, string> = {
-        'trainer': '/dashboard/trainer',
-        'admin': '/dashboard/admin'
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user]);
-
   // Read search parameters for automatic selection
   useEffect(() => {
     const paramRoadmapId = searchParams.get('roadmapId');
@@ -89,7 +74,7 @@ function CreatePageContent() {
     }
   }, [studentRoadmaps, searchParams, activeRoadmap]);
 
-  if (authLoading || roadmapsLoading) {
+  if (authLoading || roadmapsLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-[#fafaf7]">
         <div className="w-64 bg-[#0A0A0A] animate-pulse"></div>

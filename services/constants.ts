@@ -31,6 +31,7 @@ export const API_ENDPOINTS = {
   ROADMAP_SUBMIT: (id: string) => `/api/roadmaps/${id}/submit`,
   ROADMAP_APPROVE: (id: string) => `/api/roadmaps/${id}/approve`,
   ROADMAP_REJECT: (id: string) => `/api/roadmaps/${id}/reject`,
+  ROADMAP_ACTIVATE: (id: string) => `/api/roadmaps/${id}/activate`,
   MILESTONE_COMPLETE: (roadmapId: string, milestoneOrder: number) => `/api/roadmaps/${roadmapId}/milestones/${milestoneOrder}/complete`,
     MILESTONE_APPROVE: (roadmapId: string, milestoneOrder: number) => `/api/roadmaps/${roadmapId}/milestones/${milestoneOrder}/approve`,
     MILESTONE_LOCK: (roadmapId: string, milestoneOrder: number) => `/api/roadmaps/${roadmapId}/milestones/${milestoneOrder}/lock`,

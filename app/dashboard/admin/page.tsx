@@ -2,36 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useUsers } from '@/contexts';
+import { useUsers } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { adminService, type AdminAnalytics } from '@/services/admin';
 import { Users, DollarSign, UserCheck, Tag, BarChart3, ArrowRight, Settings, ShieldCheck, Activity, Zap, Clock, Award } from 'lucide-react';
 import { UserRole } from '@/types/user';
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole('admin');
   const { students, trainers, isLoading: usersLoading } = useUsers();
   const { navigate } = useNavigationWithLoading();
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'admin') {
-      const dashboardRoutes: Record<string, string> = {
-        student: '/dashboard/student',
-        trainer: '/dashboard/trainer',
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
-
-  useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (!isAuthorized || user?.role !== 'admin') return;
 
     adminService
       .getAnalytics()
@@ -41,9 +27,9 @@ export default function AdminDashboard() {
         }
       })
       .finally(() => setAnalyticsLoading(false));
-  }, [user?.role]);
+  }, [isAuthorized, user?.role]);
 
-  const isLoading = authLoading || usersLoading || analyticsLoading;
+  const isLoading = authLoading || !isAuthorized || usersLoading || analyticsLoading;
 
   if (isLoading) {
     return (

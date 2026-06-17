@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRoadmaps } from '@/contexts/RoadmapContext';
+import { UserRole, Student, Roadmap, RoadmapStepStatus } from '@/types';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { guardianService } from '@/services/guardian';
 import { certificateService } from '@/services/certificates';
 import type { CertificateRecord } from '@/services/certificates';
-import { useRoadmaps } from '@/contexts/RoadmapContext';
-import { UserRole, Student, Roadmap, RoadmapStepStatus } from '@/types';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import {
   Users,
   Map,
@@ -42,9 +41,15 @@ interface GuardianProject {
 }
 
 export default function GuardianDashboard() {
-  const { user, isAuthenticated } = useAuth();
-  const { navigate } = useNavigationWithLoading();
+  const { user, isAuthorized, authLoading } = useRequireRole(UserRole.GUARDIAN);
   const { studentRoadmaps } = useRoadmaps();
+  const roadmapSignature = useMemo(
+    () =>
+      studentRoadmaps
+        .map((roadmap) => `${roadmap.id}:${roadmap.updatedAt ?? roadmap.createdAt ?? ''}`)
+        .join('|'),
+    [studentRoadmaps]
+  );
   
   const [students, setStudents] = useState<StudentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +61,7 @@ export default function GuardianDashboard() {
 
   // Fetch linked students
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthorized) return;
 
     const fetchStudents = async () => {
       try {
@@ -89,7 +94,7 @@ export default function GuardianDashboard() {
     };
 
     fetchStudents();
-  }, [isAuthenticated, studentRoadmaps]);
+  }, [isAuthorized, roadmapSignature]);
 
   useEffect(() => {
     if (!selectedStudent?._id) {
@@ -128,14 +133,7 @@ export default function GuardianDashboard() {
     loadStudentDetails();
   }, [selectedStudent?._id]);
 
-  // Redirect if not guardian
-  useEffect(() => {
-    if (user && user.role !== UserRole.GUARDIAN) {
-      navigate('/dashboard/student');
-    }
-  }, [user, navigate]);
-
-  if (isLoading) {
+  if (authLoading || isLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
         <Sidebar activeItem="Dashboard" userType={UserRole.GUARDIAN} />

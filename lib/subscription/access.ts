@@ -4,7 +4,6 @@ export const STUDENT_LEARNING_PATH_PREFIXES = [
   '/dashboard/student/chat',
   '/dashboard/student/calendar',
   '/dashboard/student/portfolio',
-  '/dashboard/student/certificates',
 ];
 
 export const STUDENT_ALWAYS_ALLOWED_PREFIXES = [
@@ -13,6 +12,7 @@ export const STUDENT_ALWAYS_ALLOWED_PREFIXES = [
   '/dashboard/student/profile',
   '/dashboard/student/settings',
   '/dashboard/student/notifications',
+  '/dashboard/student/certificates',
 ];
 
 export function isStudentLearningPath(pathname: string) {

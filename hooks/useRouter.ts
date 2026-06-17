@@ -1,14 +1,15 @@
 'use client';
 
+import { useRouter as useNextRouter } from 'next/navigation';
 import { useRouter as useProgressBarRouter } from 'next-app-progress-bar';
-import { useRouter as useStandardRouter } from 'next/navigation';
 
 export function useRouter() {
-  // During build/SSR, we use the standard router to prevent crashes
-  // In the browser, we use the progress bar router for the loading effect
+  const nextRouter = useNextRouter();
+  const progressRouter = useProgressBarRouter();
+
   if (typeof window === 'undefined') {
-    return useStandardRouter();
+    return nextRouter;
   }
-  
-  return useProgressBarRouter();
+
+  return progressRouter;
 }
