@@ -1,11 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth } from '@/contexts';
 import { UserRole } from '@/types';
 import { availabilityService, DAY_LABELS, type WeeklySlot } from '@/services';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import { Calendar, Clock, Loader2, Save } from 'lucide-react';
 
 const defaultSchedule: WeeklySlot[] = DAY_LABELS.map((_label: string, dayOfWeek: number) => ({
@@ -16,31 +15,40 @@ const defaultSchedule: WeeklySlot[] = DAY_LABELS.map((_label: string, dayOfWeek:
 }));
 
 export default function TrainerAvailabilityPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { navigate } = useNavigationWithLoading();
+  const { user } = useAuth();
+  const trainerId = user?._id;
   const [schedule, setSchedule] = useState<WeeklySlot[]>(defaultSchedule);
   const [slotDurationMinutes, setSlotDurationMinutes] = useState(60);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [loadError, setLoadError] = useState('');
+
+  const loadAvailability = useCallback(async () => {
+    setLoading(true);
+    setLoadError('');
+    try {
+      const response = await availabilityService.getMyAvailability();
+      if (response.success && response.data) {
+        setSchedule(response.data.weeklySchedule?.length ? response.data.weeklySchedule : defaultSchedule);
+        setSlotDurationMinutes(response.data.slotDurationMinutes ?? 60);
+      } else {
+        setLoadError(response.message || 'Unable to load availability.');
+      }
+    } catch {
+      setLoadError('Unable to load availability.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!isAuthenticated || user?.role !== UserRole.TRAINER) {
-      navigate('/auth/login');
-      return;
+    if (trainerId && user?.role === UserRole.TRAINER) {
+      loadAvailability();
+    } else {
+      setLoading(false);
     }
-
-    availabilityService
-      .getMyAvailability()
-      .then((response) => {
-        if (response.success && response.data) {
-          setSchedule(response.data.weeklySchedule);
-          setSlotDurationMinutes(response.data.slotDurationMinutes);
-        }
-      })
-      .finally(() => setLoading(false));
-  }, [authLoading, isAuthenticated, user?.role, navigate]);
+  }, [trainerId, user?.role, loadAvailability]);
 
   const updateDay = (dayOfWeek: number, patch: Partial<WeeklySlot>) => {
     setSchedule((current) =>
@@ -68,7 +76,7 @@ export default function TrainerAvailabilityPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="flex min-h-screen bg-[#F8FAFC] items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -78,7 +86,7 @@ export default function TrainerAvailabilityPage() {
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Availability" userType={UserRole.TRAINER} />
+      <Sidebar activeItem="Schedule" userType={UserRole.TRAINER} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white border-b border-slate-100 px-8 py-5">
@@ -90,6 +98,19 @@ export default function TrainerAvailabilityPage() {
 
         <main className="flex-1 overflow-y-auto p-8">
           <div className="max-w-4xl mx-auto space-y-6">
+            {loadError && (
+              <div className="flex items-center justify-between gap-4 text-sm text-red-700 bg-red-50 border border-red-100 rounded-2xl px-4 py-3">
+                <span>{loadError}</span>
+                <button
+                  type="button"
+                  onClick={loadAvailability}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
             <div className="bg-white rounded-[32px] border border-slate-100 p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-6">
                 <Clock className="w-5 h-5 text-primary" />

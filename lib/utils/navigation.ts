@@ -1,17 +1,17 @@
+import { useCallback } from 'react';
 import { useRouter } from '@/hooks/useRouter';
 
 export function useNavigationWithLoading() {
   const router = useRouter();
 
-  const navigate = (href: string) => {
+  const navigate = useCallback((href: string) => {
     // Trigger loading bar immediately
     if (typeof window !== 'undefined' && window.startNavigation) {
       window.startNavigation();
     }
-    
-    // Navigate
+
     router.push(href);
-  };
+  }, [router]);
 
   return { navigate };
 }

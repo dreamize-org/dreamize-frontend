@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { X, Calendar, Clock, User, CheckCircle, MessageSquare, AlertCircle } from 'lucide-react';
 import { useUsers } from '@/contexts';
-import { Trainer, StudentBookingRequest } from '@/types';
+import { StudentBookingRequest } from '@/types';
 import { useCreateBooking } from '@/hooks/useBooking';
 import { availabilityService, type AvailabilitySlot } from '@/services';
 
@@ -15,7 +15,8 @@ interface BookingCalendarProps {
 export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarProps) {
   const { trainers } = useUsers();
   const { createBooking, isLoading, error } = useCreateBooking();
-  const [selectedTrainer, setSelectedTrainer] = useState<Trainer | null>(null);
+  const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
+  const selectedTrainer = trainers.find((trainer) => trainer._id === selectedTrainerId) ?? null;
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[]>([]);
@@ -25,22 +26,37 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
   const [bookingStep, setBookingStep] = useState<'select' | 'confirm' | 'submitting' | 'success'>('select');
 
   useEffect(() => {
-    if (!selectedTrainer || !selectedDate) {
+    if (!selectedTrainerId || !selectedDate) {
       setAvailableSlots([]);
       setSelectedSlot(null);
       return;
     }
 
+    let cancelled = false;
     setSlotsLoading(true);
     setSelectedSlot(null);
     availabilityService
-      .getTrainerSlots(selectedTrainer._id, selectedDate)
+      .getTrainerSlots(selectedTrainerId, selectedDate)
       .then((response) => {
-        setAvailableSlots(response.success && response.data ? response.data : []);
+        if (!cancelled) {
+          setAvailableSlots(response.success && response.data ? response.data : []);
+        }
       })
-      .catch(() => setAvailableSlots([]))
-      .finally(() => setSlotsLoading(false));
-  }, [selectedTrainer, selectedDate]);
+      .catch(() => {
+        if (!cancelled) {
+          setAvailableSlots([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setSlotsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTrainerId, selectedDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,7 +202,7 @@ export default function BookingCalendar({ onClose, onSuccess }: BookingCalendarP
                             ? 'border-primary bg-primary/5'
                             : 'border-slate-100 hover:border-slate-200'
                         }`}
-                        onClick={() => setSelectedTrainer(trainer)}
+                        onClick={() => setSelectedTrainerId(trainer._id)}
                       >
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
