@@ -1,26 +1,54 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import Link from 'next/link';
 import { AuthContainer } from '@/components/auth/auth-container';
 import { AuthCard } from '@/components/auth/auth-card';
 import { PremiumButton } from '@/components/ui/premium-button';
 import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
-import { authService } from '@/services/auth';
 import { useAuth } from '@/contexts';
+import { getPostAuthRoute } from '@/lib/auth/routes';
+import { useRouter } from '@/hooks/useRouter';
+
+function resolveVerificationEmail(sessionEmail?: string): string {
+  if (sessionEmail) return sessionEmail;
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem('userEmail')?.trim().toLowerCase() || '';
+}
 
 export default function VerifyPage() {
+  const router = useRouter();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [timer, setTimer] = useState(120);
-  const [email, setEmail] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const { verifyOtp, isLoading, error, clearError, syncSessionUser } = useAuth();
+
+  const {
+    user,
+    authStatus,
+    isLoading,
+    error,
+    verifyOtp,
+    resendVerificationOtp,
+    clearError,
+  } = useAuth();
+
+  const isResetFlow =
+    typeof window !== 'undefined' && localStorage.getItem('authFlow') === 'reset-password';
+
+  const email = useMemo(
+    () => resolveVerificationEmail(user?.email),
+    [user?.email]
+  );
 
   useEffect(() => {
-    const storedEmail = localStorage.getItem('userEmail') || '';
-    setEmail(storedEmail);
-  }, []);
+    clearError();
+    setFormError(null);
+    setResendMessage(null);
+  }, [clearError]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -30,32 +58,9 @@ export default function VerifyPage() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    const checkExistingVerification = async () => {
-      const sessionUser = await syncSessionUser();
-      if (cancelled || !sessionUser?.isVerified) return;
-
-      if (sessionUser.role === 'trainer' && (sessionUser as { approvalStatus?: string }).approvalStatus === 'pending') {
-        window.location.href = '/auth/pending-approval';
-        return;
-      }
-
-      const dashboardRoutes: Record<string, string> = {
-        student: '/dashboard/student',
-        trainer: '/dashboard/trainer',
-        admin: '/dashboard/admin',
-        guardian: '/dashboard/guardian',
-        sales_manager: '/dashboard/sales',
-      };
-      window.location.href = dashboardRoutes[sessionUser.role] || '/dashboard/student';
-    };
-
-    checkExistingVerification();
-    return () => {
-      cancelled = true;
-    };
-  }, [syncSessionUser]);
+    if (isLoading || authStatus !== 'ready' || !user) return;
+    router.push(getPostAuthRoute(user));
+  }, [authStatus, isLoading, router, user]);
 
   const handleChange = (index: number, value: string) => {
     if (value.length > 1) return;
@@ -108,14 +113,19 @@ export default function VerifyPage() {
     }
 
     if (!email) {
-      setFormError('Email address is missing. Please register or sign in again.');
+      setFormError('We could not determine your email. Please sign in or register again.');
       return;
     }
 
-    const success = await verifyOtp(email, otpValue);
-    if (!success) {
-      setOtp(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
+    setIsSubmitting(true);
+    try {
+      const success = await verifyOtp(email, otpValue);
+      if (!success) {
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -125,18 +135,23 @@ export default function VerifyPage() {
     setResendMessage(null);
 
     if (!email) {
-      setResendMessage('Email address is missing. Please register or sign in again.');
+      setFormError('We could not determine your email. Please sign in or register again.');
       return;
     }
 
+    setIsResending(true);
     try {
-      await authService.resendOtp(email);
-      setResendMessage('A new verification code was sent. Check your inbox and spam folder.');
+      const result = await resendVerificationOtp(email);
+      if (!result.success) {
+        setFormError(result.message || 'Could not resend the code.');
+        return;
+      }
+      setResendMessage(result.message || 'A new verification code was sent.');
       setTimer(120);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
-    } catch {
-      setResendMessage('Could not resend the code. Please try again in a moment.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -147,16 +162,61 @@ export default function VerifyPage() {
   };
 
   const displayError = error || formError;
+  const pageBusy = isSubmitting || isResending;
+
+  if (isLoading || authStatus === 'loading') {
+    return (
+      <AuthContainer>
+        <div className="flex flex-col items-center justify-center p-12">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
+          <p className="text-sm text-slate-500">Loading your verification session...</p>
+        </div>
+      </AuthContainer>
+    );
+  }
+
+  if (authStatus === 'ready') {
+    return (
+      <AuthContainer>
+        <div className="flex flex-col items-center justify-center p-12 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent mb-4" />
+          <p className="text-sm text-slate-600">Your email is already verified. Redirecting...</p>
+        </div>
+      </AuthContainer>
+    );
+  }
+
+  if (authStatus === 'guest' && !email) {
+    return (
+      <AuthContainer>
+        <AuthCard
+          title="Verification Required"
+          subtitle="Start from login or registration so we know which account to verify."
+        >
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-slate-600">
+              This page needs an active signup or password-reset request before we can send a code.
+            </p>
+            <PremiumButton type="button" onClick={() => router.push('/auth/login')}>
+              Go to Sign In
+            </PremiumButton>
+          </div>
+        </AuthCard>
+      </AuthContainer>
+    );
+  }
+
+  const title = isResetFlow ? 'Verify Reset Code' : 'Verify Email';
+  const subtitle = isResetFlow
+    ? 'Enter the 6-digit code we sent to reset your password.'
+    : 'Enter the 6-digit code sent to your email to continue.';
 
   return (
     <AuthContainer>
-      <AuthCard
-        title="Verify Email"
-        subtitle="We've sent a 6-digit code to your inbox. Enter it below to proceed."
-      >
+      <AuthCard title={title} subtitle={subtitle}>
         <button
           type="button"
-          onClick={() => window.history.back()}
+          onClick={() => router.back()}
           className="absolute top-5 left-5 sm:top-8 sm:left-8 p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-full transition-all group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -166,8 +226,8 @@ export default function VerifyPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-2xl text-primary mb-4">
             <ShieldCheck size={32} />
           </div>
-          <p className="text-[14px] text-slate-400 font-medium tracking-tight">
-            ({email || 'your email'})
+          <p className="text-[14px] text-slate-400 font-medium tracking-tight break-all">
+            {email}
           </p>
         </div>
 
@@ -184,7 +244,7 @@ export default function VerifyPage() {
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
                 onPaste={handlePaste}
-                disabled={isLoading}
+                disabled={pageBusy}
                 className={`
                   w-10 h-12 sm:w-11 sm:h-14 md:w-14 md:h-16 text-center text-lg sm:text-xl font-bold border rounded-xl 
                   focus:outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary 
@@ -202,14 +262,8 @@ export default function VerifyPage() {
           )}
 
           {resendMessage && (
-            <p className={`text-[14px] text-center font-medium ${resendMessage.includes('Could not') ? 'text-red-500' : 'text-green-600'}`}>
+            <p className="text-[14px] text-center font-medium text-green-600">
               {resendMessage}
-            </p>
-          )}
-
-          {!email && (
-            <p className="text-[14px] text-amber-600 text-center font-medium">
-              We could not find your email for verification. Please sign in or register again.
             </p>
           )}
 
@@ -223,7 +277,7 @@ export default function VerifyPage() {
               <button
                 type="button"
                 onClick={handleResend}
-                disabled={isLoading}
+                disabled={pageBusy || !email}
                 className="text-[15px] text-primary font-bold hover:underline disabled:opacity-50"
               >
                 Resend Now
@@ -233,19 +287,19 @@ export default function VerifyPage() {
 
           <PremiumButton
             type="submit"
-            isLoading={isLoading}
-            disabled={!email || isLoading}
+            isLoading={isSubmitting}
+            disabled={!email || pageBusy}
           >
-            Verify & Continue
+            {isResetFlow ? 'Verify Code' : 'Verify & Continue'}
             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
           </PremiumButton>
         </form>
 
         <div className="mt-8 text-center text-[15px] text-slate-500 font-light">
           Have an account?{' '}
-          <a href="/auth/login" className="text-primary font-bold hover:underline">
+          <Link href="/auth/login" className="text-primary font-bold hover:underline">
             Sign In
-          </a>
+          </Link>
         </div>
 
         <div className="mt-12 text-center text-[12px] text-slate-400 uppercase tracking-widest font-bold">

@@ -34,8 +34,8 @@ class AuthService {
     return response;
   }
 
-  async resendOtp(email: string): Promise<void> {
-    await apiClient.post(API_ENDPOINTS.AUTH_RESEND_OTP, { email });
+  async resendOtp(email: string): Promise<ApiResponse<{ sent: boolean }>> {
+    return apiClient.post<{ sent: boolean }>(API_ENDPOINTS.AUTH_RESEND_OTP, { email });
   }
 
   async forgotPassword(email: string): Promise<void> {
@@ -51,9 +51,7 @@ class AuthService {
     try {
       await apiClient.post(API_ENDPOINTS.AUTH_LOGOUT);
     } catch {
-      // ignore
-    } finally {
-      localStorage.clear()
+      // ignore — session is cleared by AuthContext
     }
   }
 

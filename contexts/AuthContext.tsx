@@ -1,64 +1,52 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { authService } from '@/services/auth';
+import { apiClient } from '@/services/client';
 import { BaseUser, OnboardingChecklist, StudentRegister, Trainer, UserRole, Guardian, GuardianInviteState } from '@/types';
 import { useRouter } from '@/hooks/useRouter';
 import { userService } from '@/services';
-
-const DASHBOARD_ROUTES: Record<string, string> = {
-  student: '/dashboard/student',
-  trainer: '/dashboard/trainer',
-  admin: '/dashboard/admin',
-  guardian: '/dashboard/guardian',
-  sales_manager: '/dashboard/sales',
-};
-
-function getDashboardRoute(role: string): string {
-  return DASHBOARD_ROUTES[role] || '/';
-}
-
-function canAccessDashboard(user: BaseUser): boolean {
-  if (!user.isVerified) return false;
-  if (user.role === UserRole.TRAINER && (user as Trainer).approvalStatus === 'pending') {
-    return false;
-  }
-  if (user.role === UserRole.GUARDIAN && (user as Guardian).inviteState === GuardianInviteState.INVITED) {
-    return false;
-  }
-  return true;
-}
-
-function getPostAuthRoute(user: BaseUser): string {
-  if (!user.isVerified) return '/auth/verify';
-  if (user.role === UserRole.TRAINER && (user as Trainer).approvalStatus === 'pending') {
-    return '/auth/pending-approval';
-  }
-  if (user.role === UserRole.GUARDIAN && (user as Guardian).inviteState === GuardianInviteState.INVITED) {
-    return '/auth/login';
-  }
-  return getDashboardRoute(user.role);
-}
+import {
+  AuthStatus,
+  canAccessDashboard,
+  getDashboardRoute,
+  getPostAuthRoute,
+} from '@/lib/auth/routes';
 
 interface AuthContextType {
   error: string | null;
   user: BaseUser | null;
+  /** True when user has a session (may still need verification). */
   isAuthenticated: boolean;
+  /** True only when user can access their dashboard. */
+  isSessionReady: boolean;
+  authStatus: AuthStatus;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   registerStudent: (data: Partial<StudentRegister>) => Promise<void>;
   registerTrainer: (data: Partial<Trainer>) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   onboardingChecklist: OnboardingChecklist;
   handleDashboardRedirect: () => void;
   fetchOnboardingChecklist: () => Promise<void>;
   updateUserProfile: (userData: Partial<BaseUser>) => Promise<void>;
   verifyOtp: (email: string, otpValue: string) => Promise<boolean>;
+  resendVerificationOtp: (email: string) => Promise<{ success: boolean; message?: string }>;
   clearError: () => void;
   syncSessionUser: () => Promise<BaseUser | null>;
+  clearSession: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+const REGISTRATION_DRAFT_KEYS = [
+  'userType',
+  'userFirstName',
+  'userLastName',
+  'userEmail',
+  'userPassword',
+  'userPhoneNumber',
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BaseUser | null>(null);
@@ -74,7 +62,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     learningStarted: false,
   });
 
+  const authStatus: AuthStatus = useMemo(
+    () => {
+      if (isLoading) return 'loading';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      if (!token || !user) return 'guest';
+      if (!user.isVerified) return 'verify';
+      if (user.role === UserRole.TRAINER && (user as Trainer).approvalStatus === 'pending') {
+        return 'pending';
+      }
+      if (user.role === UserRole.GUARDIAN && (user as Guardian).inviteState === GuardianInviteState.INVITED) {
+        return 'guest';
+      }
+      return 'ready';
+    },
+    [isLoading, user]
+  );
+
   const clearError = useCallback(() => setError(null), []);
+
+  const clearSession = useCallback(() => {
+    setUser(null);
+    setError(null);
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('authFlow');
+    localStorage.removeItem('resetToken');
+  }, []);
 
   const persistSession = useCallback((userData: BaseUser, token?: string) => {
     localStorage.setItem('user', JSON.stringify(userData));
@@ -85,9 +100,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
   }, []);
 
+  const clearRegistrationDraft = useCallback(() => {
+    REGISTRATION_DRAFT_KEYS.forEach((key) => localStorage.removeItem(key));
+  }, []);
+
   const syncSessionUser = useCallback(async (): Promise<BaseUser | null> => {
     const token = localStorage.getItem('auth_token');
-    if (!token) return null;
+    if (!token) {
+      setUser(null);
+      return null;
+    }
 
     try {
       const response = await userService.getMe();
@@ -95,19 +117,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         persistSession(response.data);
         return response.data;
       }
-    } catch {
-      // Fall back to stored user below
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (message.includes('401') || message.includes('403')) {
+        clearSession();
+        return null;
+      }
     }
 
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
-      const parsedUser = JSON.parse(storedUser) as BaseUser;
-      setUser(parsedUser);
-      return parsedUser;
+      try {
+        const parsedUser = JSON.parse(storedUser) as BaseUser;
+        setUser(parsedUser);
+        return parsedUser;
+      } catch {
+        clearSession();
+      }
     }
 
     return null;
-  }, [persistSession]);
+  }, [clearSession, persistSession]);
 
   const handleDashboardRedirect = useCallback(() => {
     if (!user || !canAccessDashboard(user)) return;
@@ -119,11 +149,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    const checkSession = async () => {
+    const handleUnauthorized = () => {
+      clearSession();
+      if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/')) {
+        router.push('/auth/login');
+      }
+    };
+
+    apiClient.onLogout(handleUnauthorized);
+    return () => apiClient.removeLogoutListener(handleUnauthorized);
+  }, [clearSession, router]);
+
+  useEffect(() => {
+    const bootstrap = async () => {
       setIsLoading(true);
       const token = localStorage.getItem('auth_token');
 
       if (!token) {
+        setUser(null);
         setIsLoading(false);
         return;
       }
@@ -134,40 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!sessionUser.isVerified) {
-        setIsLoading(false);
-        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/verify')) {
-          router.push('/auth/verify');
-        }
-        return;
-      }
-
-      if (sessionUser.role === UserRole.TRAINER) {
-        const trainer = sessionUser as Trainer;
-        if (trainer.approvalStatus === 'pending') {
-          setIsLoading(false);
-          if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/pending-approval')) {
-            router.push('/auth/pending-approval');
-          }
-          return;
-        }
-      }
-
-      if (sessionUser.role === UserRole.GUARDIAN) {
-        const guardian = sessionUser as Guardian;
-        if (guardian.inviteState === GuardianInviteState.INVITED) {
-          localStorage.removeItem('auth_token');
-          localStorage.removeItem('user');
-          localStorage.removeItem('userEmail');
-          setUser(null);
-          setIsLoading(false);
-          router.push('/auth/login');
-          setError('Please use the invitation email link to set up your account.');
-          return;
-        }
-      }
-
-      if (sessionUser.role === UserRole.STUDENT) {
+      if (sessionUser.role === UserRole.STUDENT && sessionUser.isVerified) {
         try {
           const response = await authService.getOnboardingChecklist();
           if (response.success && response.data) {
@@ -181,11 +191,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
     };
 
-    checkSession();
-  }, [router, syncSessionUser]);
+    bootstrap();
+  }, [syncSessionUser]);
 
   const fetchOnboardingChecklist = async () => {
-    if (user && user.role === UserRole.STUDENT) {
+    if (user && user.role === UserRole.STUDENT && user.isVerified) {
       try {
         const currentStudent = await userService.getStudent();
         if (currentStudent.success && currentStudent.data) {
@@ -202,10 +212,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    if (user?._id) {
+    if (user?._id && user.isVerified) {
       fetchOnboardingChecklist();
     }
-  }, [user?._id]);
+  }, [user?._id, user?.isVerified]);
 
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
@@ -213,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const response = await authService.login(email, password);
 
-      if (response.success && response.data) {
+      if (response.success && response.data?.token && response.data.user) {
         const userData = response.data.user as BaseUser;
         persistSession(userData, response.data.token);
 
@@ -228,16 +238,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const message = response.message || 'Login failed. Please try again.';
+
       if (message.includes('not verified')) {
         localStorage.setItem('userEmail', email);
-        await authService.sendOtp(email);
+        try {
+          await authService.sendOtp(email);
+        } catch {
+          // OTP send failure should not block redirect to verify page
+        }
         router.push('/auth/verify');
         setError('Your email is not verified yet. We sent a new code — check your inbox.');
         return;
       }
 
-      if (message.includes('pending approval')) {
+      if (message.includes('pending approval') && response.data?.token && response.data.user) {
+        persistSession(response.data.user as BaseUser, response.data.token);
         router.push('/auth/pending-approval');
+        return;
+      }
+
+      if (response.success && response.data?.user && !response.data.token) {
+        setError(message);
         return;
       }
 
@@ -256,6 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerStudent(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        clearRegistrationDraft();
         router.push('/auth/verify');
         return;
       }
@@ -274,6 +296,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerTrainer(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        clearRegistrationDraft();
         router.push('/auth/verify');
         return;
       }
@@ -286,13 +309,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const verifyOtp = async (email: string, otpValue: string): Promise<boolean> => {
-    setIsLoading(true);
     setError(null);
 
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail) {
       setError('Email address is missing. Please register again or sign in.');
-      setIsLoading(false);
       return false;
     }
 
@@ -309,12 +330,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (response.data?.token) {
           localStorage.setItem('auth_token', response.data.token);
         }
+        if (response.data?.user) {
+          persistSession(response.data.user, response.data.token);
+        }
         router.push('/auth/reset-password');
         return true;
       }
 
-      if (!response.data?.user) {
-        setError('Verification succeeded but user data was missing. Please sign in again.');
+      if (!response.data?.user || !response.data.token) {
+        setError('Verification succeeded but session data was missing. Please sign in again.');
         return false;
       }
 
@@ -324,8 +348,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid or expired code. Please try again.');
       return false;
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  const resendVerificationOtp = async (email: string): Promise<{ success: boolean; message?: string }> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      return { success: false, message: 'Email address is missing.' };
+    }
+
+    try {
+      const response = await authService.resendOtp(normalizedEmail);
+      if (!response.success) {
+        return { success: false, message: response.message || 'Could not resend the code.' };
+      }
+      return { success: true, message: 'A new verification code was sent. Check your inbox and spam folder.' };
+    } catch (err: unknown) {
+      return {
+        success: false,
+        message: err instanceof Error ? err.message : 'Could not resend the code. Please try again.',
+      };
     }
   };
 
@@ -335,11 +377,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore API errors
     } finally {
-      setUser(null);
-      setError(null);
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      localStorage.removeItem('userEmail');
+      clearSession();
+      clearRegistrationDraft();
     }
   };
 
@@ -363,7 +402,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider value={{
       user,
-      isAuthenticated: !!user,
+      isAuthenticated: authStatus !== 'loading' && authStatus !== 'guest',
+      isSessionReady: authStatus === 'ready',
+      authStatus,
       isLoading,
       login,
       registerStudent,
@@ -375,8 +416,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       fetchOnboardingChecklist,
       updateUserProfile,
       verifyOtp,
+      resendVerificationOtp,
       clearError,
       syncSessionUser,
+      clearSession,
     }}>
       {children}
     </AuthContext.Provider>

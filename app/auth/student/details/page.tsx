@@ -28,7 +28,7 @@ export default function StudentDetailsPage() {
   });
   const [showGuardianFields, setShowGuardianFields] = useState(false);
 
-  const { registerStudent, isLoading } = useAuth();
+  const { registerStudent, isLoading, error, clearError } = useAuth();
 
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -47,6 +47,7 @@ export default function StudentDetailsPage() {
 
   const handleContinue = async (e: React.FormEvent) => {
     e.preventDefault();
+    clearError();
     const newErrors = {
       dateOfBirth: '',
       gender: '',
@@ -111,17 +112,8 @@ export default function StudentDetailsPage() {
       };
 
       await registerStudent(studentData);
-      router.push('/auth/verify');
-    } catch (error) {
-      console.error('Registration failed:', error);
-    } finally {
-      setErrors({
-        dateOfBirth: '',
-        gender: '',
-        guardianName: '',
-        guardianEmail: '',
-        guardianPhoneNumber: ''
-      })
+    } catch (registrationError) {
+      console.error('Registration failed:', registrationError);
     }
   };
 
@@ -230,6 +222,12 @@ export default function StudentDetailsPage() {
                   required={showGuardianFields}
                 />
               </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-100 rounded-xl">
+              <p className="text-[14px] text-red-600 text-center font-medium">{error}</p>
             </div>
           )}
 
