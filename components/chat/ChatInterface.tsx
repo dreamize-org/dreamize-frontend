@@ -11,15 +11,23 @@ import {
   MessageSquare,
   Shield,
   ChevronLeft,
+  FileText,
+  X,
+  Loader2,
 } from 'lucide-react';
-import { messageService, socketService } from '@/services';
+import { fileService, messageService, socketService } from '@/services';
 import type { ChatContactEntry, ChatMessage } from '@/services/messages';
+import type { MessageAttachment } from '@/services/files';
+import { getMessagePreview } from '@/services/messages';
+import { BASE_URL } from '@/services/constants';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthUserId, normalizeId } from '@/lib/auth/session';
 
 interface DisplayMessage {
   id: string;
   senderId: string;
   text: string;
+  attachment?: MessageAttachment;
   timestamp: string;
   isMe: boolean;
   failed?: boolean;
@@ -32,9 +40,58 @@ interface ActiveContact {
   role: string;
 }
 
-function normalizeId(id: unknown): string {
-  if (!id) return '';
-  return String(id);
+function resolveAssetUrl(url: string): string {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${BASE_URL}${url}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function MessageAttachmentContent({
+  attachment,
+  isMe,
+}: {
+  attachment: MessageAttachment;
+  isMe: boolean;
+}) {
+  const fileUrl = resolveAssetUrl(attachment.url);
+  const isImage = attachment.mimeType.startsWith('image/');
+
+  if (isImage) {
+    return (
+      <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={fileUrl}
+          alt={attachment.name}
+          className="max-w-full max-h-64 rounded-2xl object-cover"
+        />
+      </a>
+    );
+  }
+
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2 transition-colors ${isMe ? 'bg-white/10 hover:bg-white/15' : 'bg-slate-50 hover:bg-slate-100'}`}
+    >
+      <FileText className={`w-5 h-5 shrink-0 ${isMe ? 'text-primary' : 'text-slate-500'}`} />
+      <span className="min-w-0">
+        <span className={`block text-sm font-medium truncate ${isMe ? 'text-white' : 'text-slate-800'}`}>
+          {attachment.name}
+        </span>
+        <span className={`block text-[10px] ${isMe ? 'text-white/70' : 'text-slate-400'}`}>
+          {formatFileSize(attachment.size)}
+        </span>
+      </span>
+    </a>
+  );
 }
 
 function formatTime(iso: string): string {
@@ -43,12 +100,16 @@ function formatTime(iso: string): string {
 }
 
 function mapMessage(message: ChatMessage, myId: string): DisplayMessage {
+  const senderId = normalizeId(message.senderId);
+  const resolvedMyId = normalizeId(myId);
+
   return {
     id: normalizeId(message._id),
-    senderId: normalizeId(message.senderId),
+    senderId,
     text: message.text,
+    attachment: message.attachment,
     timestamp: formatTime(message.createdAt),
-    isMe: normalizeId(message.senderId) === normalizeId(myId),
+    isMe: senderId !== '' && resolvedMyId !== '' && senderId === resolvedMyId,
   };
 }
 
@@ -67,9 +128,12 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
   const [searchQuery, setSearchQuery] = useState('');
   const [isSocketConnected, setIsSocketConnected] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<MessageAttachment | null>(null);
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const myId = normalizeId(user?._id);
+  const myId = getAuthUserId(user);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -159,7 +223,13 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
         const messageId = normalizeId(msg._id);
         if (prev.some((m) => m.id === messageId)) return prev;
         const withoutOptimistic = prev.filter(
-          (m) => !(m.id.startsWith('temp-') && m.text === msg.text && m.isMe)
+          (m) =>
+            !(
+              m.id.startsWith('temp-') &&
+              m.isMe &&
+              m.text === msg.text &&
+              normalizeId(m.attachment?.url) === normalizeId(msg.attachment?.url)
+            )
         );
         return [...withoutOptimistic, mapMessage(msg, myId)];
       });
@@ -192,6 +262,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
       setActiveContact(contact);
       setMessagesLoading(true);
       setSendError('');
+      setPendingAttachment(null);
 
       try {
         const [messagesRes] = await Promise.all([
@@ -219,12 +290,33 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
     [myId]
   );
 
+  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file || !activeContact) return;
+
+    setSendError('');
+    setIsUploadingFile(true);
+
+    try {
+      const attachment = await fileService.uploadMessageFile(file);
+      setPendingAttachment(attachment);
+    } catch (err) {
+      setSendError(err instanceof Error ? err.message : 'Failed to upload file');
+    } finally {
+      setIsUploadingFile(false);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !activeContact || !user) return;
+    if ((!message.trim() && !pendingAttachment) || !activeContact || !user) return;
 
     const text = message.trim();
+    const attachment = pendingAttachment ?? undefined;
     setMessage('');
+    setPendingAttachment(null);
     setSendError('');
 
     const tempId = `temp-${Date.now()}`;
@@ -232,6 +324,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
       id: tempId,
       senderId: myId,
       text,
+      attachment,
       timestamp: formatTime(new Date().toISOString()),
       isMe: true,
     };
@@ -260,16 +353,26 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
       );
     };
 
+    const payload = {
+      recipientId: activeContact._id,
+      text,
+      attachment,
+    };
+
     try {
       if (socketService.isConnected()) {
-        const response = await socketService.sendMessage(activeContact._id, text);
+        const response = await socketService.sendMessage(
+          activeContact._id,
+          text,
+          attachment as unknown as Record<string, unknown> | undefined
+        );
         if (response.message) {
           finalizeMessage(response.message as unknown as ChatMessage);
           return;
         }
       }
 
-      const res = await messageService.sendMessage(activeContact._id, text);
+      const res = await messageService.sendMessage(payload);
       if (res.success && res.data) {
         finalizeMessage(res.data);
       } else {
@@ -282,6 +385,8 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
       setSendError(err instanceof Error ? err.message : 'Failed to send message');
     }
   };
+
+  const canSend = Boolean(message.trim() || pendingAttachment) && !isUploadingFile;
 
   const filteredContacts = contacts.filter((entry) => {
     const name = `${entry.contact.firstName} ${entry.contact.lastName}`.toLowerCase();
@@ -382,7 +487,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
                         </span>
                         {entry.lastMessage && (
                           <p className="text-[11px] text-slate-400 truncate flex-1">
-                            {entry.lastMessage.text}
+                            {getMessagePreview(entry.lastMessage)}
                           </p>
                         )}
                       </div>
@@ -477,7 +582,12 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
                           : 'bg-white text-slate-700 border border-slate-100/80 rounded-tl-none'
                           }`}
                       >
-                        {msg.text}
+                        {msg.attachment && (
+                          <div className={msg.text ? 'mb-2' : ''}>
+                            <MessageAttachmentContent attachment={msg.attachment} isMe={msg.isMe} />
+                          </div>
+                        )}
+                        {msg.text && <span>{msg.text}</span>}
                         {msg.failed && (
                           <AlertCircle className="w-4 h-4 text-red-500 inline ml-2 align-middle" />
                         )}
@@ -499,15 +609,55 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
               {sendError && (
                 <p className="text-xs text-red-500 mb-2 px-2">{sendError}</p>
               )}
+              {pendingAttachment && (
+                <div className="mb-3 mx-2 flex items-center gap-3 rounded-2xl border border-slate-100 bg-[#fafaf7] px-3 py-2">
+                  {pendingAttachment.mimeType.startsWith('image/') ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={resolveAssetUrl(pendingAttachment.url)}
+                      alt={pendingAttachment.name}
+                      className="h-12 w-12 rounded-xl object-cover"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-slate-500" />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-slate-800 truncate">{pendingAttachment.name}</p>
+                    <p className="text-[10px] text-slate-400">{formatFileSize(pendingAttachment.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPendingAttachment(null)}
+                    className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-white"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
               <form
                 onSubmit={handleSend}
                 className="flex items-center gap-4 bg-[#fafaf7] p-2 rounded-[24px] border border-slate-100 focus-within:border-primary/20 focus-within:bg-white transition-all shadow-sm"
               >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept="image/jpeg,image/png,image/gif,image/webp,application/pdf,text/plain,.doc,.docx"
+                  onChange={handleFileSelect}
+                />
                 <button
                   type="button"
-                  className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-primary transition-all hover:bg-white rounded-full"
+                  disabled={!activeContact || isUploadingFile}
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-12 h-12 flex items-center justify-center text-slate-400 hover:text-primary transition-all hover:bg-white rounded-full disabled:opacity-40"
                 >
-                  <Paperclip className="w-5 h-5" />
+                  {isUploadingFile ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Paperclip className="w-5 h-5" />
+                  )}
                 </button>
                 <div className="flex-1 relative">
                   <input
@@ -520,7 +670,7 @@ export default function ChatInterface({ userType: _userType }: { userType: strin
                 </div>
                 <button
                   type="submit"
-                  disabled={!message.trim()}
+                  disabled={!canSend}
                   className="w-10 h-10 bg-slate-900 text-white rounded-full flex items-center justify-center shadow-md hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed group"
                 >
                   <Send className="w-4 h-4 text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />

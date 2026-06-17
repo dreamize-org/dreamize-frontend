@@ -12,6 +12,7 @@ import {
   getDashboardRoute,
   getPostAuthRoute,
 } from '@/lib/auth/routes';
+import { getTokenUserId, normalizeId } from '@/lib/auth/session';
 
 interface AuthContextType {
   error: string | null;
@@ -129,6 +130,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser) as BaseUser;
+        const tokenUserId = getTokenUserId();
+        const storedUserId = normalizeId(parsedUser._id) || normalizeId((parsedUser as { id?: string }).id);
+
+        if (tokenUserId && storedUserId && tokenUserId !== storedUserId) {
+          clearSession();
+          return null;
+        }
+
         setUser(parsedUser);
         return parsedUser;
       } catch {

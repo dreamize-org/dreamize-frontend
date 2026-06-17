@@ -74,7 +74,11 @@ const socketService = {
     notifyConnection(false);
   },
 
-  sendMessage(recipientId: string, text: string): Promise<{ success: boolean; message?: Record<string, unknown>; error?: string }> {
+  sendMessage(
+    recipientId: string,
+    text: string,
+    attachment?: Record<string, unknown>
+  ): Promise<{ success: boolean; message?: Record<string, unknown>; error?: string }> {
     return new Promise((resolve, reject) => {
       if (!socket?.connected) {
         reject(new Error('Chat connection is offline'));
@@ -83,7 +87,7 @@ const socketService = {
 
       socket.emit(
         SOCKET_EVENTS.SEND_MESSAGE,
-        { recipientId, text },
+        { recipientId, text, attachment },
         (response?: { success: boolean; message?: Record<string, unknown>; error?: string }) => {
           if (response?.success) {
             resolve(response);
