@@ -1,14 +1,14 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRouter } from '@/hooks/useRouter';
 
 export default function TrainerCalendarRedirectPage() {
-  const { navigate } = useNavigationWithLoading();
+  const router = useRouter();
 
   useEffect(() => {
-    navigate('/dashboard/trainer/availability');
-  }, [navigate]);
+    router.replace('/dashboard/trainer/availability');
+  }, [router]);
 
   return null;
 }

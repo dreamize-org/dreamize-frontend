@@ -53,9 +53,22 @@ export default function AdminProfilePage() {
 
     return (
         <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
-            <Sidebar activeItem="Profile" userType={UserRole.ADMIN} />
+            <Sidebar activeItem="profile" userType={UserRole.ADMIN} />
 
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-10">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                Administration
+                            </span>
+                            <span className="text-slate-300 hidden sm:inline">•</span>
+                            <span className="text-[12px] font-medium text-slate-400 italic">Your Profile</span>
+                        </div>
+                        <h1 className="text-2xl font-playfair font-bold text-slate-900">Admin Profile</h1>
+                    </div>
+                </header>
+
                 <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
                     <div className="max-w-full mx-auto">
                         {/* Profile Header Card */}
@@ -358,20 +371,21 @@ export default function AdminProfilePage() {
 
 function SettingsItem({ icon, label, color }: { icon: React.ReactNode, label: string, color: string }) {
     const colors = {
+        slate: 'bg-slate-50 text-slate-600 group-hover:bg-primary group-hover:text-white',
         gray: 'bg-gray-50 text-gray-600 group-hover:bg-yellow-600',
     };
 
-    const colorClasses = colors[color as keyof typeof colors] || colors.gray;
+    const colorClasses = colors[color as keyof typeof colors] || colors.slate;
 
     return (
-        <button className="w-full flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100 group">
+        <button className="w-full flex items-center justify-between p-4 rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-slate-100 group">
             <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center group-hover:text-white transition-all duration-300 ${colorClasses}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300 ${colorClasses}`}>
                     {icon}
                 </div>
-                <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">{label}</span>
+                <span className="text-sm font-semibold text-slate-700 group-hover:text-slate-900">{label}</span>
             </div>
-            <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-gray-900 group-hover:translate-x-1 transition-all" />
+            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-slate-900 group-hover:translate-x-1 transition-all" />
         </button>
     );
 }

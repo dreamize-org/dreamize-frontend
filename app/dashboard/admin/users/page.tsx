@@ -1,21 +1,56 @@
 'use client';
 
-import { useState } from 'react';
-import Sidebar from '@/components/dashboard/Sidebar';
+import { useMemo, useState } from 'react';
 import {
-  Users, UserCheck, Shield, GraduationCap, X, Search,
-  Mail, Phone,
-  Eye, Edit2, Trash2,
-  CheckCircle, XCircle, AlertCircle, Download, UserCircle,
-  UserPlus, SlidersHorizontal, Lock, Clock
-} from 'lucide-react';
-import { useAdminContext } from '@/contexts';
-import { useAdmin } from '@/hooks/useAdmin';
-import { BaseUser, UserRole } from '@/types';
+  AdminEmptyState,
+  AdminFooter,
+  AdminHeader,
+  AdminLoadingState,
+  AdminMain,
+  AdminPanel,
+  AdminSectionBadge,
+  AdminShell,
+  AdminStatCard,
+} from '@/components/admin/AdminLayout';
 import UserDetailModal from '@/components/umbrella-admin/UserDetailModal';
 import EditUserModal from '@/components/umbrella-admin/EditUserModal';
 import { PremiumInput } from '@/components/ui/premium-input';
 import { PremiumButton } from '@/components/ui/premium-button';
+import { useAdminContext } from '@/contexts';
+import { useAdmin } from '@/hooks/useAdmin';
+import {
+  formatUserRole,
+  getAvatarColor,
+  getRoleBadgeClasses,
+  getStatusBadgeClasses,
+  getStatusLabel,
+  getUserAccountStatus,
+  getUserInitials,
+  type UserAccountStatus,
+} from '@/lib/admin/userDisplay';
+import { BaseUser, UserRole } from '@/types';
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Download,
+  Edit2,
+  Eye,
+  GraduationCap,
+  Lock,
+  Mail,
+  Phone,
+  Search,
+  Shield,
+  SlidersHorizontal,
+  Trash2,
+  UserCheck,
+  UserCircle,
+  UserPlus,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react';
 
 interface CreateUserForm {
   firstName: string;
@@ -39,28 +74,19 @@ const EMPTY_FORM: CreateUserForm = {
   lastName: '',
   email: '',
   password: '',
-  role: UserRole.STUDENT,
-  phoneNumber: ''
+  role: UserRole.SALES_MANAGER,
+  phoneNumber: '',
 };
 
-const getInitials = (firstName: string, lastName: string) => {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-};
+type RoleTab = 'students' | 'trainers' | 'guardians' | 'admins' | 'sales_managers';
 
-const getAvatarColor = (role: UserRole) => {
-  switch (role) {
-    case UserRole.STUDENT: return 'bg-blue-500';
-    case UserRole.TRAINER: return 'bg-purple-500';
-    case UserRole.GUARDIAN: return 'bg-teal-500';
-    case UserRole.ADMIN: return 'bg-slate-900';
-    default: return 'bg-slate-400';
-  }
-};
+const PAGE_SIZE = 10;
 
 export default function AdminUsersPage() {
-  const [selectedTab, setSelectedTab] = useState<'students' | 'trainers' | 'guardians' | 'admins' | 'sales_managers'>('students');
+  const [selectedTab, setSelectedTab] = useState<RoleTab>('students');
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'pending'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | UserAccountStatus>('all');
+  const [page, setPage] = useState(1);
 
   const { users, trainers, usersLoading, refreshUsers } = useAdminContext();
   const { createUser, updateUser, deleteUser, isLoading: processing } = useAdmin();
@@ -74,40 +100,105 @@ export default function AdminUsersPage() {
   const [success, setSuccess] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  const getFilteredUsers = () => {
+  const tabs = useMemo(
+    () =>
+      [
+        {
+          key: 'students' as const,
+          label: 'Students',
+          shortLabel: 'Students',
+          count: users.filter((u) => u.role === UserRole.STUDENT).length,
+          icon: GraduationCap,
+        },
+        {
+          key: 'trainers' as const,
+          label: 'Trainers',
+          shortLabel: 'Trainers',
+          count: trainers.length,
+          icon: Users,
+        },
+        {
+          key: 'guardians' as const,
+          label: 'Guardians',
+          shortLabel: 'Guardians',
+          count: users.filter((u) => u.role === UserRole.GUARDIAN).length,
+          icon: UserCircle,
+        },
+        {
+          key: 'admins' as const,
+          label: 'Admins',
+          shortLabel: 'Admins',
+          count: users.filter((u) => u.role === UserRole.ADMIN).length,
+          icon: Shield,
+        },
+        {
+          key: 'sales_managers' as const,
+          label: 'Sales',
+          shortLabel: 'Sales',
+          count: users.filter((u) => u.role === UserRole.SALES_MANAGER).length,
+          icon: UserCheck,
+        },
+      ] as const,
+    [users, trainers.length]
+  );
+
+  const filteredUsers = useMemo(() => {
     let filtered = users;
+
     switch (selectedTab) {
-      case 'students': filtered = users.filter(u => u.role === UserRole.STUDENT); break;
-      case 'trainers': filtered = users.filter(u => u.role === UserRole.TRAINER); break;
-      case 'guardians': filtered = users.filter(u => u.role === UserRole.GUARDIAN); break;
-      case 'sales_managers': filtered = users.filter(u => u.role === UserRole.SALES_MANAGER); break;
-      case 'admins': filtered = users.filter(u => u.role === UserRole.ADMIN); break;
+      case 'students':
+        filtered = users.filter((u) => u.role === UserRole.STUDENT);
+        break;
+      case 'trainers':
+        filtered = users.filter((u) => u.role === UserRole.TRAINER);
+        break;
+      case 'guardians':
+        filtered = users.filter((u) => u.role === UserRole.GUARDIAN);
+        break;
+      case 'sales_managers':
+        filtered = users.filter((u) => u.role === UserRole.SALES_MANAGER);
+        break;
+      case 'admins':
+        filtered = users.filter((u) => u.role === UserRole.ADMIN);
+        break;
     }
-    if (searchQuery) {
+
+    if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(u =>
-        u.firstName.toLowerCase().includes(query) ||
-        u.lastName.toLowerCase().includes(query) ||
-        u.email.toLowerCase().includes(query) ||
-        u.phoneNumber?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (u) =>
+          u.firstName.toLowerCase().includes(query) ||
+          u.lastName.toLowerCase().includes(query) ||
+          u.email.toLowerCase().includes(query) ||
+          u.phoneNumber?.toLowerCase().includes(query)
       );
     }
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(u => {
-        if (statusFilter === 'active') return u.isActive && u.isVerified;
-        if (statusFilter === 'inactive') return !u.isActive;
-        if (statusFilter === 'pending') return u.isActive && !u.isVerified;
-        return true;
-      });
-    }
-    return filtered;
-  };
 
-  const filteredUsers = getFilteredUsers();
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((u) => getUserAccountStatus(u) === statusFilter);
+    }
+
+    return filtered;
+  }, [users, selectedTab, searchQuery, statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
+
   const totalUsers = users.length;
-  const activeUsers = users.filter(u => u.isActive && u.isVerified).length;
-  const pendingUsers = users.filter(u => u.isActive && !u.isVerified).length;
-  const inactiveUsers = users.filter(u => !u.isActive).length;
+  const activeUsers = users.filter((u) => u.isActive && u.isVerified).length;
+  const pendingUsers = users.filter((u) => u.isActive && !u.isVerified).length;
+  const inactiveUsers = users.filter((u) => !u.isActive).length;
+
+  const openCreateModal = (role?: UserRole) => {
+    setShowCreateModal(true);
+    setForm({ ...EMPTY_FORM, role: role ?? UserRole.SALES_MANAGER });
+    setLocalError(null);
+    setSuccess(false);
+  };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +206,7 @@ export default function AdminUsersPage() {
     setSuccess(false);
 
     if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.password.trim()) {
-      setLocalError('All fields are required');
+      setLocalError('First name, last name, email, and password are required.');
       return;
     }
 
@@ -131,289 +222,311 @@ export default function AdminUsersPage() {
       setSuccess(true);
       setForm(EMPTY_FORM);
       await refreshUsers();
-      setTimeout(() => { setShowCreateModal(false); setSuccess(false); }, 1200);
+      setTimeout(() => {
+        setShowCreateModal(false);
+        setSuccess(false);
+      }, 1200);
     } else {
-      setLocalError('Failed to create user');
+      setLocalError('Failed to create user. Please try again.');
     }
   };
 
-  const handleViewUser = (user: BaseUser) => {
-    setSelectedUser(user);
-    setShowDetailModal(true);
-  };
-
-  const handleEditUser = (user: BaseUser) => {
-    setSelectedUser(user);
-    setShowEditModal(true);
-  };
-
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm('Delete this user? This action cannot be undone.')) return;
     await deleteUser(userId);
     await refreshUsers();
   };
 
-  const tabs = [
-    { key: 'students', label: 'Students', count: users.filter(u => u.role === UserRole.STUDENT).length, icon: GraduationCap },
-    { key: 'trainers', label: 'Trainers', count: trainers.length, icon: Users },
-    { key: 'guardians', label: 'Guardians', count: users.filter(u => u.role === UserRole.GUARDIAN).length, icon: UserCircle },
-    { key: 'admins', label: 'Admins', count: users.filter(u => u.role === UserRole.ADMIN).length, icon: Shield },
-    { key: 'sales_managers', label: 'Sales Managers', count: users.filter(u => u.role === UserRole.SALES_MANAGER).length, icon: UserCheck },
-  ] as const;
+  const exportCsv = () => {
+    const rows = [
+      ['First Name', 'Last Name', 'Email', 'Phone', 'Role', 'Status', 'Joined'].join(','),
+      ...filteredUsers.map((user) => {
+        const status = getStatusLabel(getUserAccountStatus(user));
+        return [
+          user.firstName,
+          user.lastName,
+          user.email,
+          user.phoneNumber ?? '',
+          formatUserRole(user.role),
+          status,
+          new Date(user.createdAt).toLocaleDateString(),
+        ].join(',');
+      }),
+    ].join('\n');
+
+    const blob = new Blob([rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `users-${selectedTab}-${new Date().toISOString().split('T')[0]}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Users" userType={UserRole.ADMIN} />
+    <AdminShell activeItem="users">
+      <AdminHeader
+        badge="People"
+        subtitle="User Directory"
+        title="User Management"
+        actions={
+          <button
+            onClick={() => openCreateModal()}
+            className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-sm hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 flex items-center gap-2"
+          >
+            <UserPlus className="w-4 h-4 text-primary" />
+            Add User
+          </button>
+        }
+      />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Header */}
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[12px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full uppercase tracking-wider">System Administration</span>
-                <span className="text-slate-300">•</span>
-                <span className="text-[12px] font-medium text-slate-400 italic">User Directory</span>
-              </div>
-              <h1 className="text-2xl font-bold text-slate-900">User Management</h1>
-            </div>
+      <AdminMain>
+        <AdminSectionBadge label="Platform Accounts" />
 
-            <div className="flex items-center gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <AdminStatCard label="Total Users" value={totalUsers} icon={Users} iconClassName="text-blue-500" iconBgClassName="bg-blue-50" />
+          <AdminStatCard label="Verified" value={activeUsers} icon={UserCheck} iconClassName="text-green-500" iconBgClassName="bg-green-50" />
+          <AdminStatCard label="Pending" value={pendingUsers} icon={Clock} iconClassName="text-orange-500" iconBgClassName="bg-orange-50" />
+          <AdminStatCard label="Suspended" value={inactiveUsers} icon={XCircle} iconClassName="text-red-500" iconBgClassName="bg-red-50" />
+        </div>
+
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto mb-6 w-full max-w-full">
+          {tabs.map((tab) => {
+            const isActive = selectedTab === tab.key;
+            return (
               <button
-                onClick={() => { setShowCreateModal(true); setForm({ ...EMPTY_FORM, role: UserRole.SALES_MANAGER }); setLocalError(null); setSuccess(false); }}
-                className="px-6 py-2.5 bg-primary text-white rounded-2xl font-bold text-[14px] hover:bg-primary/90 transition-all shadow-lg shadow-blue-600/10 flex items-center gap-2 group"
+                key={tab.key}
+                onClick={() => {
+                  setSelectedTab(tab.key);
+                  setPage(1);
+                }}
+                className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                  isActive ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
-                <UserPlus className="w-4 h-4 text-white" />
-                Add Sales Manager
+                <tab.icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-primary' : ''}`} />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                    isActive ? 'bg-primary/10 text-primary' : 'bg-slate-200 text-slate-600'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <AdminPanel
+          title={`${tabs.find((t) => t.key === selectedTab)?.label ?? 'Users'} Directory`}
+          description={`${filteredUsers.length} account${filteredUsers.length === 1 ? '' : 's'} matching your filters`}
+          headerRight={
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <div className="relative group flex-1 sm:flex-none min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-primary transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search name, email, phone..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setPage(1);
+                  }}
+                  className="w-full sm:w-64 pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 rounded-xl">
+                <SlidersHorizontal size={16} className="text-slate-400" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'all' || value === 'verified' || value === 'pending' || value === 'suspended') {
+                      setStatusFilter(value);
+                      setPage(1);
+                    }
+                  }}
+                  className="bg-transparent border-none text-sm font-bold text-slate-600 focus:ring-0 cursor-pointer"
+                >
+                  <option value="all">All statuses</option>
+                  <option value="verified">Verified</option>
+                  <option value="pending">Pending</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </div>
+              <button
+                onClick={exportCsv}
+                disabled={filteredUsers.length === 0}
+                className="p-2.5 bg-slate-50 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all disabled:opacity-40"
+                title="Export CSV"
+              >
+                <Download size={18} />
               </button>
             </div>
-          </div>
-        </header>
-
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
-          <div className="max-w-7xl mx-auto">
-            
-            {/* Section Header with Badge */}
-            <div className="mb-10">
-              <div className="relative inline-flex items-center justify-center mb-6">
-                <div className="absolute -top-[14px] -left-[14px] w-9 h-9 pointer-events-none text-primary">
-                  <svg viewBox="0 0 40 40" strokeWidth="4" stroke="currentColor" fill="none" strokeLinecap="round">
-                    <line x1="8" y1="8" x2="14" y2="14" />
-                    <line x1="2" y1="20" x2="10" y2="20" />
-                    <line x1="20" y1="2" x2="20" y2="10" />
-                  </svg>
-                </div>
-                <span className="text-sm font-semibold tracking-[0.5px] text-primary bg-primary/20 px-5 py-2 rounded-full shadow-sm border border-primary/10">
-                  User Directory
-                </span>
-              </div>
-            </div>
-
-            {/* Stats Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              {[
-                { label: 'Total Users', value: totalUsers, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-                { label: 'Verified', value: activeUsers, icon: UserCheck, color: 'text-green-500', bg: 'bg-green-50' },
-                { label: 'Pending', value: pendingUsers, icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
-                { label: 'Suspended', value: inactiveUsers, icon: XCircle, color: 'text-red-500', bg: 'bg-red-50' },
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white border border-slate-100 rounded-[24px] p-8 shadow-[0_20px_40px_rgba(0,0,0,0.06)] hover:shadow-[0_25px_45px_rgba(0,0,0,0.1)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 group">
-                   <div className={`w-12 h-12 ${stat.bg} rounded-xl flex items-center justify-center mb-5 transition-transform group-hover:scale-110`}>
-                      <stat.icon className={`w-5 h-5 ${stat.color}`} />
-                   </div>
-                   <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                   <p className="text-3xl font-bold text-slate-900 mt-2">{stat.value}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Content Container */}
-            <div className="bg-white rounded-[24px] border border-slate-100 shadow-[0_20px_40px_rgba(0,0,0,0.06)] overflow-hidden">
-              
-              {/* Tabs & Search Header */}
-              <div className="p-8 border-b border-slate-50">
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                  {/* Tabs */}
-                  <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto">
-                    {tabs.map((tab) => {
-                      const isActive = selectedTab === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          onClick={() => setSelectedTab(tab.key)}
-                          className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                            isActive 
-                              ? 'bg-white text-slate-900 shadow-sm' 
-                              : 'text-slate-500 hover:text-slate-700'
+          }
+        >
+          {usersLoading ? (
+            <AdminLoadingState label="Loading users..." />
+          ) : filteredUsers.length === 0 ? (
+            <AdminEmptyState
+              icon={Users}
+              title="No users found"
+              description="Try a different role tab, search term, or status filter."
+            />
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50/50">
+                      {['User', 'Contact', 'Status', 'Role', 'Joined', 'Actions'].map((heading) => (
+                        <th
+                          key={heading}
+                          className={`px-4 sm:px-6 lg:px-8 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400 ${
+                            heading === 'Actions' ? 'text-right' : ''
                           }`}
                         >
-                          <tab.icon className={`w-4 h-4 ${isActive ? 'text-primary' : ''}`} />
-                          {tab.label}
-                          <span className={`ml-1 text-[10px] px-1.5 py-0.5 rounded-md ${isActive ? 'bg-primary/10 text-primary' : 'bg-slate-200'}`}>
-                            {tab.count}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex flex-wrap items-center gap-3">
-                    <div className="relative group">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 group-focus-within:text-primary transition-colors" />
-                      <input 
-                        type="text" 
-                        placeholder="Filter by name or email..." 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-10 pr-4 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-primary/20 transition-all w-full sm:w-64"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-50 rounded-xl border-none">
-                      <SlidersHorizontal size={16} className="text-slate-400" />
-                      <select
-                        value={statusFilter}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v === 'all' || v === 'active' || v === 'inactive' || v === 'pending') {
-                            setStatusFilter(v);
-                          }
-                        }}
-                        className="bg-transparent border-none text-sm font-bold text-slate-600 focus:ring-0 cursor-pointer"
-                      >
-                        <option value="all">All Status</option>
-                        <option value="active">Verified</option>
-                        <option value="pending">Pending</option>
-                        <option value="inactive">Suspended</option>
-                      </select>
-                    </div>
-                    <button className="p-2.5 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-xl transition-all">
-                      <Download size={20} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Table Section */}
-              <div className="overflow-x-auto">
-                {usersLoading ? (
-                  <div className="p-20 text-center">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                    <p className="text-slate-400 font-medium">Updating Directory...</p>
-                  </div>
-                ) : filteredUsers.length === 0 ? (
-                  <div className="p-20 text-center">
-                    <div className="w-20 h-20 bg-slate-50 rounded-[32px] flex items-center justify-center mx-auto mb-6">
-                      <Users size={40} className="text-slate-200" />
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-900 mb-2">No Matches Found</h3>
-                    <p className="text-slate-500 font-light">Refine your search parameters to find the user.</p>
-                  </div>
-                ) : (
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50/50">
-                        <th className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">User Identity</th>
-                        <th className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Contact Details</th>
-                        <th className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Account Status</th>
-                        <th className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Role</th>
-                        <th className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-right text-[11px] font-bold uppercase tracking-[0.2em] text-slate-400">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {filteredUsers.map((user) => (
-                        <tr key={user._id} className="group hover:bg-slate-50/50 transition-all duration-300">
-                          <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                            <div className="flex items-center gap-4">
-                              <div className={`w-12 h-12 rounded-[18px] flex items-center justify-center text-white font-black text-sm shadow-lg shadow-black/5 transition-transform group-hover:scale-110 ${getAvatarColor(user.role)}`}>
-                                {getInitials(user.firstName, user.lastName)}
+                          {heading}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {paginatedUsers.map((user) => {
+                      const accountStatus = getUserAccountStatus(user);
+                      return (
+                        <tr key={user._id} className="group hover:bg-slate-50/50 transition-colors">
+                          <td className="px-4 sm:px-6 lg:px-8 py-4">
+                            <div className="flex items-center gap-3 min-w-[200px]">
+                              <div
+                                className={`w-11 h-11 rounded-2xl flex items-center justify-center text-white font-bold text-sm shadow-md transition-transform group-hover:scale-105 ${getAvatarColor(user.role)}`}
+                              >
+                                {getUserInitials(user.firstName, user.lastName)}
                               </div>
-                              <div>
-                                <div className="font-bold text-slate-900 group-hover:text-primary transition-colors">
+                              <div className="min-w-0">
+                                <p className="font-semibold text-slate-900 truncate group-hover:text-primary transition-colors">
                                   {user.firstName} {user.lastName}
-                                </div>
-                                <div className="text-sm text-slate-500 font-light">{user.email}</div>
+                                </p>
+                                <p className="text-xs text-slate-400 capitalize">{formatUserRole(user.role)}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                            <div className="flex items-center gap-2 text-[13px] text-slate-600 font-medium">
-                              <Phone size={14} className="text-slate-400" />
-                              {user.phoneNumber || 'N/A'}
+                          <td className="px-4 sm:px-6 lg:px-8 py-4">
+                            <div className="space-y-1.5 text-sm text-slate-600">
+                              <div className="flex items-center gap-2">
+                                <Mail size={14} className="text-slate-400 shrink-0" />
+                                <span className="truncate max-w-[180px]">{user.email}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Phone size={14} className="text-slate-400 shrink-0" />
+                                <span>{user.phoneNumber || '—'}</span>
+                              </div>
                             </div>
                           </td>
-                          <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                            <span className={`px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                              user.status === 'active' ? 'bg-green-100 text-green-700' :
-                              user.status === 'pending' ? 'bg-orange-100 text-orange-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>
-                              {user.status || 'unknown'}
+                          <td className="px-4 sm:px-6 lg:px-8 py-4">
+                            <span
+                              className={`inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider border ${getStatusBadgeClasses(accountStatus)}`}
+                            >
+                              {getStatusLabel(accountStatus)}
                             </span>
                           </td>
-                          <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                            <span className="text-[12px] font-black uppercase text-slate-400 tracking-widest">{user.role}</span>
+                          <td className="px-4 sm:px-6 lg:px-8 py-4">
+                            <span
+                              className={`inline-flex px-3 py-1 rounded-full text-[11px] font-bold border ${getRoleBadgeClasses(user.role)}`}
+                            >
+                              {formatUserRole(user.role)}
+                            </span>
                           </td>
-                          <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-                            <div className="flex items-center justify-end gap-2">
+                          <td className="px-4 sm:px-6 lg:px-8 py-4 text-sm text-slate-600 whitespace-nowrap">
+                            {new Date(user.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </td>
+                          <td className="px-4 sm:px-6 lg:px-8 py-4">
+                            <div className="flex items-center justify-end gap-1">
                               <button
-                                onClick={() => handleViewUser(user)}
-                                className="p-2.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
-                                title="Overview"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setShowDetailModal(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-xl transition-all"
+                                title="View details"
                               >
-                                <Eye size={18} />
+                                <Eye size={17} />
                               </button>
                               <button
-                                onClick={() => handleEditUser(user)}
-                                className="p-2.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
-                                title="Modify"
+                                onClick={() => {
+                                  setSelectedUser(user);
+                                  setShowEditModal(true);
+                                }}
+                                className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"
+                                title="Edit user"
                               >
-                                <Edit2 size={18} />
+                                <Edit2 size={17} />
                               </button>
                               <button
                                 onClick={() => handleDeleteUser(user._id)}
-                                className="p-2.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                                title="Terminate"
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                                title="Delete user"
                               >
-                                <Trash2 size={18} />
+                                <Trash2 size={17} />
                               </button>
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
-              {/* Footer Info */}
-              <div className="p-6 bg-slate-50/50 border-t border-slate-50 flex items-center justify-between">
-                 <p className="text-xs text-slate-400 font-medium italic">Showing {filteredUsers.length} of {totalUsers} registered identities</p>
-                 <div className="flex items-center gap-2">
-                    <button className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">Previous</button>
-                    <button className="px-4 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all shadow-sm">Next</button>
-                 </div>
+              <div className="px-6 sm:px-8 py-4 bg-slate-50/50 border-t border-slate-50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <p className="text-xs text-slate-500">
+                  Showing {(currentPage - 1) * PAGE_SIZE + 1}–
+                  {Math.min(currentPage * PAGE_SIZE, filteredUsers.length)} of {filteredUsers.length}
+                  {filteredUsers.length !== totalUsers ? ` (${totalUsers} total on platform)` : ''}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                    className="px-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs font-bold text-slate-400 px-2">
+                    {currentPage} / {totalPages}
+                  </span>
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                    className="px-4 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
               </div>
-            </div>
+            </>
+          )}
+        </AdminPanel>
 
-            <div className="mt-12 text-center">
-               <p className="text-slate-400 text-[11px] font-bold tracking-[0.3em] uppercase italic"> Dreamize Africa 2025 • Admin Directory Protocol</p>
-            </div>
-          </div>
-        </main>
-      </div>
+        <AdminFooter label="© Dreamize Africa 2025 • User Directory" />
+      </AdminMain>
 
-      {/* Create User Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-xl p-10 relative overflow-hidden">
+          <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-xl p-8 sm:p-10 relative overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 blur-[80px] rounded-full -mr-32 -mt-32" />
-            
+
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-8">
                 <div>
-                  <h2 className="text-xl font-playfair font-bold text-slate-900">User Directory</h2>
-                  <p className="text-slate-500 text-sm font-light italic">Manage all platform accounts and permissions</p>
+                  <h2 className="text-xl font-playfair font-bold text-slate-900">Create User Account</h2>
+                  <p className="text-slate-500 text-sm font-light mt-1">Add a new platform account with a chosen role.</p>
                 </div>
                 <button
                   onClick={() => setShowCreateModal(false)}
@@ -424,34 +537,34 @@ export default function AdminUsersPage() {
               </div>
 
               {success && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-[20px] flex items-center gap-3">
+                <div className="mb-6 p-4 bg-green-50 border border-green-100 rounded-2xl flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-500" />
-                  <p className="text-sm text-green-700 font-bold">Identity established successfully!</p>
+                  <p className="text-sm text-green-700 font-medium">User created successfully.</p>
                 </div>
               )}
 
               {localError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-[20px] flex items-center gap-3">
+                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3">
                   <AlertCircle className="w-5 h-5 text-red-500" />
                   <p className="text-sm text-red-700 font-medium">{localError}</p>
                 </div>
               )}
 
-              <form onSubmit={handleCreateSubmit} className="space-y-6">
+              <form onSubmit={handleCreateSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <PremiumInput
                     label="First Name"
                     icon={<UserCircle size={20} />}
-                    placeholder="E.g. David"
+                    placeholder="David"
                     value={form.firstName}
-                    onChange={e => setForm({ ...form, firstName: e.target.value })}
+                    onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                   />
                   <PremiumInput
                     label="Last Name"
                     icon={<UserCircle size={20} />}
-                    placeholder="E.g. Mugisha"
+                    placeholder="Mugisha"
                     value={form.lastName}
-                    onChange={e => setForm({ ...form, lastName: e.target.value })}
+                    onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                   />
                 </div>
 
@@ -461,28 +574,30 @@ export default function AdminUsersPage() {
                   type="email"
                   placeholder="name@dreamize.rw"
                   value={form.email}
-                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
                 />
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                   <PremiumInput
+                  <PremiumInput
                     label="Phone Number"
                     icon={<Phone size={20} />}
                     placeholder="+250..."
                     value={form.phoneNumber}
-                    onChange={e => setForm({ ...form, phoneNumber: e.target.value })}
+                    onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
                   />
-                   <div className="space-y-2">
-                    <label className="block text-[13px] font-bold text-slate-700 ml-1">Access Role</label>
+                  <div className="space-y-2">
+                    <label className="block text-[13px] font-bold text-slate-700 ml-1">Role</label>
                     <div className="relative group">
                       <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors z-10" />
                       <select
                         value={form.role}
-                        onChange={e => setForm({ ...form, role: e.target.value as UserRole })}
+                        onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
                         className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl text-[14px] font-medium focus:bg-white focus:border-primary/20 focus:ring-0 transition-all outline-none appearance-none"
                       >
-                        {ROLES.map(r => (
-                          <option key={r.value} value={r.value}>{r.label}</option>
+                        {ROLES.map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
                         ))}
                       </select>
                     </div>
@@ -490,26 +605,22 @@ export default function AdminUsersPage() {
                 </div>
 
                 <PremiumInput
-                  label="Security Password"
+                  label="Password"
                   icon={<Lock size={20} />}
                   type="password"
-                  placeholder="Min. 8 characters"
+                  placeholder="Minimum 8 characters"
                   value={form.password}
-                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
                 />
 
-                <div className="flex gap-4 pt-4">
-                  <PremiumButton
-                    type="submit"
-                    isLoading={processing}
-                    className="flex-1"
-                  >
-                    Confirm Deployment
+                <div className="flex gap-3 pt-2">
+                  <PremiumButton type="submit" isLoading={processing} className="flex-1">
+                    Create Account
                   </PremiumButton>
                   <button
                     type="button"
                     onClick={() => setShowCreateModal(false)}
-                    className="px-8 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all"
+                    className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all"
                   >
                     Cancel
                   </button>
@@ -520,12 +631,14 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Detail & Edit Modals - Assuming they will be updated in separate component files or remain functional */}
       {showDetailModal && selectedUser && (
         <UserDetailModal
           user={selectedUser}
           onClose={() => setShowDetailModal(false)}
-          onEdit={() => { setShowDetailModal(false); setShowEditModal(true); }}
+          onEdit={() => {
+            setShowDetailModal(false);
+            setShowEditModal(true);
+          }}
         />
       )}
 
@@ -540,6 +653,6 @@ export default function AdminUsersPage() {
           }}
         />
       )}
-    </div>
+    </AdminShell>
   );
 }

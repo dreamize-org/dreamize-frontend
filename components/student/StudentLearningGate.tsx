@@ -14,10 +14,10 @@ export default function StudentLearningGate({ children }: { children: React.Reac
   const { navigate } = useNavigationWithLoading();
 
   useEffect(() => {
-    if (authStatus === 'ready' && user?.role === 'student') {
+    if (authStatus === 'ready' && user?.role === 'student' && user?._id) {
       fetchOnboardingChecklist().catch(() => undefined);
     }
-  }, [authStatus, fetchOnboardingChecklist, pathname, user?.role]);
+  }, [authStatus, user?.role, user?._id, fetchOnboardingChecklist]);
 
   if (!requiresActiveSubscription(pathname)) {
     return <>{children}</>;

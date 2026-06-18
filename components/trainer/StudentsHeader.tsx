@@ -4,6 +4,8 @@ import { useMemo } from 'react';
 import { Users, GraduationCap, CheckCircle, Activity, Award } from 'lucide-react';
 import { useUsers } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthUserId } from '@/lib/auth/session';
+import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { useRoadmaps } from '@/contexts/RoadmapContext';
 import { RoadmapStepStatus } from '@/types/roadmap';
 
@@ -14,7 +16,7 @@ export default function StudentsHeader() {
 
   const myStudents = useMemo(() => {
     if (!user) return [];
-    return students.filter(student => student.assignedTrainerId === user._id);
+    return filterStudentsForTrainer(students, getAuthUserId(user));
   }, [students, user]);
 
   const stats = useMemo(() => {

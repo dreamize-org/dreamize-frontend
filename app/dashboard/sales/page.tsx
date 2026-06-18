@@ -2,51 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { Users, Phone, Calendar, ArrowRight, TrendingUp, Clock, UserCheck, Loader2 } from 'lucide-react';
 import { UserRole } from '@/types/user';
 import { salesService, type SalesLeadRecord } from '@/services';
 import { LeadStatus } from '@/types/dashboard';
 
 export default function SalesManagerDashboard() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole('sales_manager');
   const { navigate } = useNavigationWithLoading();
   const [dashboard, setDashboard] = useState<{ totalFreeSignups: number; conversionRate: number; leads: SalesLeadRecord[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Redirect if not authenticated or not a sales manager
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
+    if (!isAuthorized || user?.role !== 'sales_manager') return;
 
-    if (!authLoading && user && user.role !== 'sales_manager') {
-      const dashboardRoutes: Record<string, string> = {
-        'student': '/dashboard/student',
-        'trainer': '/dashboard/trainer',
-        'admin': '/dashboard/admin',
-        'guardian': '/dashboard/guardian',
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
+    salesService
+      .getDashboard()
+      .then((response) => {
+        if (response.success && response.data) {
+          setDashboard(response.data);
+        }
+      })
+      .finally(() => setLoading(false));
+  }, [isAuthorized, user?.role]);
 
-  useEffect(() => {
-    if (user?.role === 'sales_manager') {
-      salesService
-        .getDashboard()
-        .then((response) => {
-          if (response.success && response.data) {
-            setDashboard(response.data);
-          }
-        })
-        .finally(() => setLoading(false));
-    }
-  }, [user?.role]);
-
-  const isLoading = authLoading || loading;
+  const isLoading = authLoading || !isAuthorized || loading;
 
   if (isLoading) {
     return (

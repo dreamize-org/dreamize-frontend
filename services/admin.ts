@@ -232,8 +232,24 @@ class AdminService {
   }
 
   async rejectRoadmap(roadmapId: string, rejectionReason: string): Promise<ApiResponse<Roadmap>> {
-    // This would typically call API_ENDPOINTS.ROADMAP_REJECT(roadmapId)
     const response = await apiClient.post<Roadmap>(API_ENDPOINTS.ROADMAP_REJECT(roadmapId), { rejectionReason });
+    return response;
+  }
+
+  async activateRoadmap(roadmapId: string): Promise<ApiResponse<Roadmap>> {
+    const response = await apiClient.post<Roadmap>(API_ENDPOINTS.ROADMAP_ACTIVATE(roadmapId), {});
+    return response;
+  }
+
+  async setMilestoneLockState(
+    roadmapId: string,
+    milestoneOrder: number,
+    locked: boolean
+  ): Promise<ApiResponse<Roadmap>> {
+    const response = await apiClient.patch<Roadmap>(
+      API_ENDPOINTS.MILESTONE_LOCK(roadmapId, milestoneOrder),
+      { locked }
+    );
     return response;
   }
 

@@ -13,8 +13,7 @@ import {
   Loader2,
   MessageSquare,
 } from 'lucide-react';
-import { useAuth } from '@/contexts';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { UserRole } from '@/types/user';
 import { LeadStatus } from '@/types/dashboard';
 import { salesService, type SalesLeadRecord } from '@/services';
@@ -36,8 +35,7 @@ const STATUS_COLORS: Record<LeadStatus, string> = {
 };
 
 export default function SalesManagerLeadsPage() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
-  const { navigate } = useNavigationWithLoading();
+  const { user, authLoading, isAuthorized } = useRequireRole('sales_manager');
   const [leads, setLeads] = useState<SalesLeadRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,20 +61,10 @@ export default function SalesManagerLeadsPage() {
   }, [searchQuery, statusFilter]);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-    if (!authLoading && user && user.role !== 'sales_manager') {
-      navigate('/dashboard/admin');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
-
-  useEffect(() => {
-    if (user?.role === 'sales_manager') {
+    if (isAuthorized && user?.role === 'sales_manager') {
       loadLeads();
     }
-  }, [user?.role, loadLeads]);
+  }, [isAuthorized, user?.role, loadLeads]);
 
   const openLeadEditor = (lead: SalesLeadRecord) => {
     setSelectedLead(lead);

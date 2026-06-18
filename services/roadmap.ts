@@ -70,13 +70,12 @@ class RoadmapService {
         return response.data;
     }
 
-    async updateMilestoneStatus(roadmapId: string, milestoneOrder: number, status: RoadmapStepStatus, trainerFeedback?: string) {
-        const roadmap = await this.getRoadmapById(roadmapId);
-        const updatedMilestones = roadmap?.milestones.map(m =>
-            m.order === milestoneOrder ? { ...m, status, ...(trainerFeedback && { trainerFeedback }) } : m
+    async setMilestoneLockState(roadmapId: string, milestoneOrder: number, locked: boolean) {
+        const response = await apiClient.patch<Roadmap>(
+            API_ENDPOINTS.MILESTONE_LOCK(roadmapId, milestoneOrder),
+            { locked }
         );
-        const response = await this.updateRoadmap(roadmapId, { milestones: updatedMilestones });
-        return response;
+        return response.data;
     }
 }
 

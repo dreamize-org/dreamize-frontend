@@ -40,7 +40,7 @@ export default function StudentProfilePage() {
             joinDate: user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—',
             bio: (user as Student).bio || '',
         });
-    }, [user]);
+    }, [user?._id, user?.firstName, user?.lastName, user?.email, user?.phoneNumber, user?.createdAt, (user as Student | null)?.bio]);
 
     useEffect(() => {
         if (!user?._id) return;

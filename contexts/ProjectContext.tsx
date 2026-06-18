@@ -2,7 +2,8 @@
 
 import { projectService } from "@/services/project";
 import { Project } from "@/types";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useAuth } from "./AuthContext";
 
 interface ProjectContextType {
   projects: Project[];
@@ -14,11 +15,12 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+  const { user, sessionEpoch, isSessionReady } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -26,14 +28,22 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
       setProjects(response.data || []);
     } catch {
       setError('Failed to load projects');
+      setProjects([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    if (!user?._id || !isSessionReady) {
+      setProjects([]);
+      setError(null);
+      setIsLoading(false);
+      return;
+    }
+
     loadProjects();
-  }, []);
+  }, [user?._id, user?.role, sessionEpoch, isSessionReady, loadProjects]);
 
   return (
     <ProjectContext.Provider value={{ projects, isLoading, error, refreshProjects: loadProjects }}>

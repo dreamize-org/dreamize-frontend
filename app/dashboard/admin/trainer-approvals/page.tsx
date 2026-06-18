@@ -62,8 +62,8 @@ export default function TrainerApprovalsPage() {
   };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Trainer Approvals" userType={UserRole.ADMIN} />
+    <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+      <Sidebar activeItem="trainers" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -75,7 +75,7 @@ export default function TrainerApprovalsPage() {
                 <span className="text-slate-300">•</span>
                 <span className="text-[12px] font-medium text-slate-400 italic">Faculty Vetting</span>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Trainer Onboarding Queue</h1>
+              <h1 className="text-2xl font-playfair font-bold text-slate-900">Trainer Onboarding Queue</h1>
             </div>
 
             <div className="flex items-center gap-3">

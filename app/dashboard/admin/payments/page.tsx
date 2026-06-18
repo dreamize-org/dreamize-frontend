@@ -81,8 +81,8 @@ export default function PaymentsPage() {
   };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Payments" userType={UserRole.ADMIN} />
+    <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+      <Sidebar activeItem="payments" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -94,7 +94,7 @@ export default function PaymentsPage() {
                 <span className="text-slate-300">•</span>
                 <span className="text-[12px] font-medium text-slate-400 italic">Revenue Audit</span>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Payments & Transactions</h1>
+              <h1 className="text-2xl font-playfair font-bold text-slate-900">Payments & Transactions</h1>
             </div>
 
             <div className="flex items-center gap-3">

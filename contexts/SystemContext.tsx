@@ -24,7 +24,7 @@ interface SystemContextType {
 const SystemContext = createContext<SystemContextType | undefined>(undefined);
 
 export function SystemProvider({ children }: { children: React.ReactNode }) {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, sessionEpoch } = useAuth();
 
   // Simple permission check function
   const hasPermission = ()=> {
@@ -92,10 +92,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [currentUser, currentUser?.role]);
+  }, [currentUser?._id, currentUser?.role]);
 
   useEffect(() => {
-    if (currentUser) {
+    if (currentUser?._id) {
       loadSystemData();
 
       // Re-fetch every 30 seconds for real-time system monitoring
@@ -111,7 +111,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       setHealthScore(0);
       setIsLoading(false);
     }
-  }, [currentUser, loadSystemData]);
+  }, [currentUser?._id, currentUser?.role, sessionEpoch, loadSystemData]);
 
   const getHealthyMetricsFromContext = (): SystemMetric[] => {
     return metrics.filter(metric => metric.status === 'healthy');

@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useRoadmaps, useProjects } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { Milestone, UserRole, RoadmapStepStatus, Roadmap } from '@/types';
 import { roadmapService } from '@/services/roadmap';
 import { useSearchParams } from 'next/navigation';
@@ -13,9 +14,10 @@ import {
   Plus, Trash2, Sparkles, ArrowRight, Loader2, ChevronLeft, Award
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TagListInput } from '@/components/ui/TagListInput';
 
 function CreatePageContent() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthorized, authLoading } = useRequireRole('student');
   const { studentRoadmaps, isLoading: roadmapsLoading, refreshRoadmaps } = useRoadmaps();
   const { refreshProjects } = useProjects();
   const { navigate } = useNavigationWithLoading();
@@ -50,22 +52,6 @@ function CreatePageContent() {
   // Automatically find the active roadmap or the first roadmap
   const activeRoadmap = studentRoadmaps?.find(r => r.status === 'active' || r.status === 'pending-approval') || studentRoadmaps?.[0] || null;
 
-  // Redirect if not authenticated or not a student
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'student') {
-      const dashboardRoutes: Record<string, string> = {
-        'trainer': '/dashboard/trainer',
-        'admin': '/dashboard/admin'
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user]);
-
   // Read search parameters for automatic selection
   useEffect(() => {
     const paramRoadmapId = searchParams.get('roadmapId');
@@ -88,7 +74,7 @@ function CreatePageContent() {
     }
   }, [studentRoadmaps, searchParams, activeRoadmap]);
 
-  if (authLoading || roadmapsLoading) {
+  if (authLoading || roadmapsLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-[#fafaf7]">
         <div className="w-64 bg-[#0A0A0A] animate-pulse"></div>
@@ -133,11 +119,8 @@ function CreatePageContent() {
       return;
     }
 
-    if (
-      selectedMilestone.status !== RoadmapStepStatus.ACTIVE &&
-      selectedMilestone.status !== RoadmapStepStatus.LOCKED
-    ) {
-      setSubmitError('You can only submit projects for active milestones.');
+    if (selectedMilestone.status !== RoadmapStepStatus.ACTIVE) {
+      setSubmitError('You can only submit projects for the active milestone on your roadmap.');
       return;
     }
 
@@ -175,7 +158,7 @@ function CreatePageContent() {
   };
 
   const canSelectMilestone = (status: RoadmapStepStatus) =>
-    status === RoadmapStepStatus.ACTIVE || status === RoadmapStepStatus.LOCKED;
+    status === RoadmapStepStatus.ACTIVE;
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-gradient-to-br from-blue-50/20 via-[#fafaf7] to-[#FDF9F2] overflow-hidden">
@@ -315,7 +298,7 @@ function CreatePageContent() {
                             key={milestone.order}
                             onClick={() => {
                               if (!canSelectMilestone(milestone.status)) {
-                                setSubmitError('This milestone is not open for submission yet.');
+                                setSubmitError('Only the active milestone is open for submission.');
                                 return;
                               }
                               setSubmitError('');
@@ -513,46 +496,16 @@ function CreatePageContent() {
                             )}
 
                             {/* Add Tool Input */}
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                id="toolInput"
-                                placeholder="e.g., Python, React Native, Figma, OpenCV"
-                                className="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all text-sm outline-none"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    const input = e.target as HTMLInputElement;
-                                    const value = input.value.trim();
-                                    if (value && !projectSubmission.toolsUsed.includes(value)) {
-                                      setProjectSubmission({
-                                        ...projectSubmission,
-                                        toolsUsed: [...projectSubmission.toolsUsed, value]
-                                      });
-                                      input.value = '';
-                                    }
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const input = document.getElementById('toolInput') as HTMLInputElement;
-                                  const value = input.value.trim();
-                                  if (value && !projectSubmission.toolsUsed.includes(value)) {
-                                    setProjectSubmission({
-                                      ...projectSubmission,
-                                      toolsUsed: [...projectSubmission.toolsUsed, value]
-                                    });
-                                    input.value = '';
-                                  }
-                                }}
-                                className="px-5 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium flex items-center justify-center flex-shrink-0"
-                              >
-                                <Plus className="w-4 h-4" />
-                              </button>
-                            </div>
-                            <p className="text-[10px] text-slate-400">Press Enter or click + to add a tool tag.</p>
+                            <TagListInput
+                              id="toolInput"
+                              tags={projectSubmission.toolsUsed}
+                              onChange={(toolsUsed) =>
+                                setProjectSubmission({ ...projectSubmission, toolsUsed })
+                              }
+                              placeholder="e.g., Python, React Native, Figma, OpenCV"
+                              inputClassName="flex-1 px-4 py-3 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:bg-white focus:border-primary/20 focus:ring-0 transition-all text-sm outline-none"
+                              buttonClassName="px-5 py-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-colors text-sm font-medium flex items-center justify-center flex-shrink-0"
+                            />
                           </div>
                         </div>
 

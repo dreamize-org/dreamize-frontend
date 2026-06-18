@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth } from '@/contexts/AuthContext';
+import { useRoadmaps } from '@/contexts/RoadmapContext';
+import { UserRole, Student, Roadmap, RoadmapStepStatus } from '@/types';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { guardianService } from '@/services/guardian';
 import { certificateService } from '@/services/certificates';
 import type { CertificateRecord } from '@/services/certificates';
-import { useRoadmaps } from '@/contexts/RoadmapContext';
-import { UserRole, Student, Roadmap, RoadmapStepStatus } from '@/types';
-import { useNavigationWithLoading } from '@/lib/utils/navigation';
 import {
   Users,
   Map,
@@ -33,7 +32,8 @@ interface StudentWithDetails extends Student {
 }
 
 interface GuardianProject {
-  _id: string;
+  id?: string;
+  _id?: string;
   title: string;
   description: string;
   category: string;
@@ -41,10 +41,20 @@ interface GuardianProject {
   approvedAt?: string;
 }
 
+function getRecordKey(item: { id?: string; _id?: string }, fallback: string): string {
+  return item.id ?? item._id ?? fallback;
+}
+
 export default function GuardianDashboard() {
-  const { user, isAuthenticated } = useAuth();
-  const { navigate } = useNavigationWithLoading();
+  const { user, isAuthorized, authLoading } = useRequireRole(UserRole.GUARDIAN);
   const { studentRoadmaps } = useRoadmaps();
+  const roadmapSignature = useMemo(
+    () =>
+      studentRoadmaps
+        .map((roadmap) => `${roadmap.id}:${roadmap.updatedAt ?? roadmap.createdAt ?? ''}`)
+        .join('|'),
+    [studentRoadmaps]
+  );
   
   const [students, setStudents] = useState<StudentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +66,7 @@ export default function GuardianDashboard() {
 
   // Fetch linked students
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthorized) return;
 
     const fetchStudents = async () => {
       try {
@@ -89,7 +99,7 @@ export default function GuardianDashboard() {
     };
 
     fetchStudents();
-  }, [isAuthenticated, studentRoadmaps]);
+  }, [isAuthorized, roadmapSignature]);
 
   useEffect(() => {
     if (!selectedStudent?._id) {
@@ -128,14 +138,7 @@ export default function GuardianDashboard() {
     loadStudentDetails();
   }, [selectedStudent?._id]);
 
-  // Redirect if not guardian
-  useEffect(() => {
-    if (user && user.role !== UserRole.GUARDIAN) {
-      navigate('/dashboard/student');
-    }
-  }, [user, navigate]);
-
-  if (isLoading) {
+  if (authLoading || isLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
         <Sidebar activeItem="Dashboard" userType={UserRole.GUARDIAN} />
@@ -335,8 +338,8 @@ export default function GuardianDashboard() {
 
                        {selectedStudent.roadmap ? (
                          <div className="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
-                            {selectedStudent.roadmap.milestones.map((milestone, idx) => (
-                              <div key={idx} className="flex gap-6 relative z-10">
+                            {selectedStudent.roadmap.milestones.map((milestone) => (
+                              <div key={milestone.order} className="flex gap-6 relative z-10">
                                  <div className="mt-1">
                                     {getMilestoneStatusIcon(milestone.status)}
                                  </div>
@@ -384,8 +387,11 @@ export default function GuardianDashboard() {
                         <p className="text-slate-400 italic">No certificates earned yet.</p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {studentCertificates.map((certificate) => (
-                            <div key={certificate._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                          {studentCertificates.map((certificate, index) => (
+                            <div
+                              key={getRecordKey(certificate, `certificate-${index}`)}
+                              className="p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                            >
                               <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">
                                 {certificate.certificateNumber}
                               </p>
@@ -396,7 +402,7 @@ export default function GuardianDashboard() {
                               <button
                                 onClick={() =>
                                   certificateService.downloadCertificate(
-                                    certificate._id,
+                                    getRecordKey(certificate, certificate.certificateNumber),
                                     certificate.certificateNumber
                                   )
                                 }
@@ -422,8 +428,11 @@ export default function GuardianDashboard() {
                         <p className="text-slate-400 italic">No approved projects yet.</p>
                       ) : (
                         <div className="space-y-4">
-                          {studentProjects.map((project) => (
-                            <div key={project._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                          {studentProjects.map((project, index) => (
+                            <div
+                              key={getRecordKey(project, `project-${index}`)}
+                              className="p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                            >
                               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                                 {project.category}
                               </p>

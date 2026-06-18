@@ -2,36 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
-import { useAuth, useUsers } from '@/contexts';
+import { useUsers } from '@/contexts';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { adminService, type AdminAnalytics } from '@/services/admin';
 import { Users, DollarSign, UserCheck, Tag, BarChart3, ArrowRight, Settings, ShieldCheck, Activity, Zap, Clock, Award } from 'lucide-react';
 import { UserRole } from '@/types/user';
 
 export default function AdminDashboard() {
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole('admin');
   const { students, trainers, isLoading: usersLoading } = useUsers();
   const { navigate } = useNavigationWithLoading();
   const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'admin') {
-      const dashboardRoutes: Record<string, string> = {
-        student: '/dashboard/student',
-        trainer: '/dashboard/trainer',
-      };
-      navigate(dashboardRoutes[user.role] || '/');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
-
-  useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (!isAuthorized || user?.role !== 'admin') return;
 
     adminService
       .getAnalytics()
@@ -41,14 +27,14 @@ export default function AdminDashboard() {
         }
       })
       .finally(() => setAnalyticsLoading(false));
-  }, [user?.role]);
+  }, [isAuthorized, user?.role]);
 
-  const isLoading = authLoading || usersLoading || analyticsLoading;
+  const isLoading = authLoading || !isAuthorized || usersLoading || analyticsLoading;
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-        <Sidebar activeItem="Dashboard" userType={UserRole.ADMIN} />
+      <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+        <Sidebar activeItem="home" userType={UserRole.ADMIN} />
         <div className="flex-1 flex flex-col">
           <div className="h-20 bg-white border-b border-slate-100 animate-pulse"></div>
           <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-8">
@@ -99,7 +85,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
-      <Sidebar activeItem="Dashboard" userType={UserRole.ADMIN} />
+      <Sidebar activeItem="home" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-10">

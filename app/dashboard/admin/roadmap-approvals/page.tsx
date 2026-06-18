@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { UserRole } from '@/types/user';
-import { Roadmap } from '@/types/roadmap';
+import { Roadmap, RoadmapStepStatus } from '@/types/roadmap';
 import { useAuth } from '@/contexts';
 import { adminService } from '@/services/admin';
 import { MapPin, Clock, X, Calendar, Award, AlertCircle, Compass, Target, ChevronRight, GraduationCap, ThumbsUp, ThumbsDown } from 'lucide-react';
@@ -19,12 +19,14 @@ export default function RoadmapApprovalsPage() {
   const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'active'>('pending');
   
-  const loadPendingRoadmaps = async () => {
+  const loadRoadmaps = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await adminService.getPendingRoadmaps();
+      const response = await adminService.getRoadmaps();
       setRoadmaps(response.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load roadmaps');
@@ -35,18 +37,81 @@ export default function RoadmapApprovalsPage() {
   };
 
   useEffect(() => {
-    loadPendingRoadmaps();
+    loadRoadmaps();
   },[]);
+
+  const pendingRoadmaps = roadmaps.filter((roadmap) => roadmap.status === 'pending-approval');
+  const approvedRoadmaps = roadmaps.filter((roadmap) => roadmap.status === 'approved');
+  const activeRoadmaps = roadmaps.filter((roadmap) => roadmap.status === 'active');
+
+  const visibleRoadmaps =
+    activeTab === 'pending'
+      ? pendingRoadmaps
+      : activeTab === 'approved'
+        ? approvedRoadmaps
+        : activeRoadmaps;
+
+  const getMilestoneStatusLabel = (status: RoadmapStepStatus) => {
+    switch (status) {
+      case RoadmapStepStatus.ACTIVE:
+        return 'Active';
+      case RoadmapStepStatus.COMPLETED:
+        return 'Completed';
+      case RoadmapStepStatus.PENDING_APPROVAL:
+        return 'Pending review';
+      default:
+        return 'Locked';
+    }
+  };
+
+  const refreshSelectedRoadmap = async (roadmapId: string) => {
+    const response = await adminService.getRoadmaps();
+    const latest = response.data?.find((roadmap) => roadmap.id === roadmapId);
+    if (latest) {
+      setSelectedRoadmap(latest);
+    }
+    setRoadmaps(response.data || []);
+  };
 
   const handleApprove = async (roadmapId: string) => {
     setActionLoading(true);
+    setActionError(null);
     try {
       await adminService.approveRoadmap(roadmapId, user?._id || 'admin');
-      await loadPendingRoadmaps();
+      await loadRoadmaps();
       setShowDetails(false);
       setSelectedRoadmap(null);
     } catch (error) {
-      console.error('Failed to approve roadmap:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to approve roadmap.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleActivate = async (roadmapId: string) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await adminService.activateRoadmap(roadmapId);
+      await loadRoadmaps();
+      if (selectedRoadmap?.id === roadmapId) {
+        await refreshSelectedRoadmap(roadmapId);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to activate roadmap.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleMilestoneToggle = async (roadmapId: string, milestoneOrder: number, locked: boolean) => {
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      await adminService.setMilestoneLockState(roadmapId, milestoneOrder, locked);
+      await refreshSelectedRoadmap(roadmapId);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to update milestone.');
     } finally {
       setActionLoading(false);
     }
@@ -55,15 +120,16 @@ export default function RoadmapApprovalsPage() {
   const handleReject = async () => {
     if (!selectedRoadmap || !rejectionReason.trim()) return;
     setActionLoading(true);
+    setActionError(null);
     try {
       await adminService.rejectRoadmap(selectedRoadmap.id, rejectionReason);
-      await loadPendingRoadmaps();
+      await loadRoadmaps();
       setShowRejectionModal(false);
       setShowDetails(false);
       setSelectedRoadmap(null);
       setRejectionReason('');
     } catch (error) {
-      console.error('Failed to reject roadmap:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to reject roadmap.');
     } finally {
       setActionLoading(false);
     }
@@ -71,6 +137,7 @@ export default function RoadmapApprovalsPage() {
 
   const viewRoadmapDetails = (roadmap: Roadmap) => {
     setSelectedRoadmap(roadmap);
+    setActionError(null);
     setShowDetails(true);
   };
 
@@ -83,8 +150,8 @@ export default function RoadmapApprovalsPage() {
   };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Roadmap Approvals" userType={UserRole.ADMIN} />
+    <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+      <Sidebar activeItem="roadmaps" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -96,13 +163,13 @@ export default function RoadmapApprovalsPage() {
                 <span className="text-slate-300">•</span>
                 <span className="text-[12px] font-medium text-slate-400 italic">Pedagogical Review</span>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Roadmap Approval Queue</h1>
+              <h1 className="text-2xl font-playfair font-bold text-slate-900">Roadmap Approval Queue</h1>
             </div>
 
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-2xl border border-indigo-100">
                 <Compass className="w-4 h-4 text-indigo-500" />
-                <span className="text-sm font-bold text-indigo-600">{roadmaps.length} Pending Peer-Review</span>
+                <span className="text-sm font-bold text-indigo-600">{pendingRoadmaps.length} Pending</span>
               </div>
             </div>
           </div>
@@ -110,6 +177,35 @@ export default function RoadmapApprovalsPage() {
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto mb-8 w-fit max-w-full">
+              {[
+                { id: 'pending' as const, label: 'Pending Review', count: pendingRoadmaps.length },
+                { id: 'approved' as const, label: 'Approved (Needs Launch)', count: approvedRoadmaps.length },
+                { id: 'active' as const, label: 'Active Roadmaps', count: activeRoadmaps.length },
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                        isActive ? 'bg-primary/10 text-primary' : 'bg-slate-200'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
             
             {/* Section Header with Badge */}
             <div className="mb-10">
@@ -127,6 +223,13 @@ export default function RoadmapApprovalsPage() {
               </div>
             </div>
 
+            {actionError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-[20px] flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-red-500" />
+                <p className="text-sm text-red-700 font-medium">{actionError}</p>
+              </div>
+            )}
+
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-[20px] flex items-center gap-3">
                 <AlertCircle className="w-5 h-5 text-red-500" />
@@ -140,17 +243,25 @@ export default function RoadmapApprovalsPage() {
                   <div key={i} className="h-80 bg-white border border-slate-100 rounded-[24px] animate-pulse" />
                 ))}
               </div>
-            ) : roadmaps.length === 0 ? (
+            ) : visibleRoadmaps.length === 0 ? (
               <div className="text-center py-20 bg-white border border-slate-100 rounded-[24px] shadow-[0_20px_40px_rgba(0,0,0,0.06)]">
                 <div className="w-20 h-20 bg-slate-50 rounded-[32px] flex items-center justify-center mx-auto mb-6">
                   <Target size={40} className="text-slate-200" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Curriculum Clear</h3>
-                <p className="text-slate-500 font-light">All submitted learning paths have been audited.</p>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                  {activeTab === 'pending' ? 'Curriculum Clear' : 'Nothing here yet'}
+                </h3>
+                <p className="text-slate-500 font-light">
+                  {activeTab === 'pending'
+                    ? 'All submitted learning paths have been audited.'
+                    : activeTab === 'approved'
+                      ? 'No roadmaps waiting to be launched.'
+                      : 'No active student roadmaps yet.'}
+                </p>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {roadmaps.map((roadmap) => (
+                {visibleRoadmaps.map((roadmap) => (
                   <div key={roadmap.id} className="bg-white border border-slate-100 rounded-[24px] p-8 shadow-[0_20px_40px_rgba(0,0,0,0.06)] hover:shadow-[0_25px_45px_rgba(0,0,0,0.1)] hover:-translate-y-2 hover:scale-[1.02] transition-all duration-300 group flex flex-col">
                     <div className="flex items-center gap-3 mb-5">
                       <div className="w-12 h-12 bg-slate-900 rounded-xl flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
@@ -251,16 +362,43 @@ export default function RoadmapApprovalsPage() {
                     <div className="space-y-4">
                       {selectedRoadmap.milestones.map((milestone, index) => (
                         <div key={index} className="bg-white border border-slate-100 rounded-[24px] p-6 hover:shadow-lg transition-all group">
-                          <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-start justify-between mb-4 gap-3">
                             <div className="flex items-center gap-3">
                                <div className="w-8 h-8 bg-slate-900 rounded-lg flex items-center justify-center text-white text-xs font-black">
                                   {index + 1}
                                </div>
-                               <h5 className="font-black text-slate-900 group-hover:text-primary transition-colors">{milestone.title}</h5>
+                               <div>
+                                 <h5 className="font-black text-slate-900 group-hover:text-primary transition-colors">{milestone.title}</h5>
+                                 <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                                   {getMilestoneStatusLabel(milestone.status)}
+                                 </span>
+                               </div>
                             </div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
-                              {milestone.estimatedDurationDays} Days Est.
-                            </span>
+                            <div className="flex flex-col items-end gap-2">
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-1 rounded-md">
+                                {milestone.estimatedDurationDays} Days Est.
+                              </span>
+                              {selectedRoadmap.status === 'active' && milestone.status === RoadmapStepStatus.LOCKED && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMilestoneToggle(selectedRoadmap.id, milestone.order, false)}
+                                  disabled={actionLoading}
+                                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50"
+                                >
+                                  Enable Milestone
+                                </button>
+                              )}
+                              {selectedRoadmap.status === 'active' && milestone.status === RoadmapStepStatus.ACTIVE && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleMilestoneToggle(selectedRoadmap.id, milestone.order, true)}
+                                  disabled={actionLoading}
+                                  className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+                                >
+                                  Lock Milestone
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <p className="text-sm text-slate-500 font-light mb-4 leading-relaxed">{milestone.description}</p>
                           
@@ -279,26 +417,60 @@ export default function RoadmapApprovalsPage() {
 
               {/* Action Footer */}
               <div className="flex items-center gap-4 mt-10 pt-8 border-t border-slate-100">
-                <div className="flex-1">
-                   <PremiumButton
-                    onClick={() => handleApprove(selectedRoadmap.id)}
-                    isLoading={actionLoading}
-                    className="w-full !py-4"
-                  >
-                    <div className="flex items-center justify-center gap-2">
-                       <ThumbsUp size={18} />
-                       Approve Learning Path
+                {selectedRoadmap.status === 'pending-approval' && (
+                  <>
+                    <div className="flex-1">
+                      <PremiumButton
+                        onClick={() => handleApprove(selectedRoadmap.id)}
+                        isLoading={actionLoading}
+                        className="w-full !py-4"
+                      >
+                        <div className="flex items-center justify-center gap-2">
+                          <ThumbsUp size={18} />
+                          Approve & Launch Roadmap
+                        </div>
+                      </PremiumButton>
                     </div>
-                  </PremiumButton>
-                </div>
-                <button
-                  onClick={() => setShowRejectionModal(true)}
-                  disabled={actionLoading}
-                  className="px-10 py-4 bg-red-50 text-red-600 rounded-[20px] font-bold text-sm hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
-                >
-                  <ThumbsDown size={18} />
-                  Reject
-                </button>
+                    <button
+                      onClick={() => setShowRejectionModal(true)}
+                      disabled={actionLoading}
+                      className="px-10 py-4 bg-red-50 text-red-600 rounded-[20px] font-bold text-sm hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+                    >
+                      <ThumbsDown size={18} />
+                      Reject
+                    </button>
+                  </>
+                )}
+
+                {selectedRoadmap.status === 'approved' && (
+                  <div className="flex-1">
+                    <PremiumButton
+                      onClick={() => handleActivate(selectedRoadmap.id)}
+                      isLoading={actionLoading}
+                      className="w-full !py-4"
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Target size={18} />
+                        Launch Roadmap & Enable First Milestone
+                      </div>
+                    </PremiumButton>
+                  </div>
+                )}
+
+                {selectedRoadmap.status === 'active' && (
+                  <div className="flex-1 space-y-3">
+                    <p className="text-sm text-slate-600">
+                      Use <strong>Enable Milestone</strong> on locked steps below. Only one milestone should be active at a time unless the previous one is completed.
+                    </p>
+                    <PremiumButton
+                      onClick={() => handleActivate(selectedRoadmap.id)}
+                      isLoading={actionLoading}
+                      className="w-full !py-4"
+                    >
+                      Enable Next Locked Milestone
+                    </PremiumButton>
+                  </div>
+                )}
               </div>
             </div>
           </div>

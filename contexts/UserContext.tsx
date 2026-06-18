@@ -19,7 +19,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, sessionEpoch } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -30,6 +30,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     setError(null);
     try {
+      if (userRole === UserRole.TRAINER) {
+        const [studentResponse, trainerResponse] = await Promise.all([
+          userService.getMyStudents(),
+          userService.getTrainers(),
+        ]);
+        const studentsData = studentResponse.data || [];
+        const trainersData = trainerResponse.data || [];
+        setTrainers(trainersData);
+        setStudents(studentsData);
+        setUsers([...studentsData, ...trainersData]);
+        return;
+      }
+
       const studentResponse = await userService.getStudents();
       const trainerResponse = await userService.getTrainers();
       const studentsData = studentResponse.data || [];
@@ -46,14 +59,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
 
 
+  const userId = currentUser?._id;
+  const userRole = currentUser?.role;
+  const shouldLoadDirectory =
+    Boolean(userId) &&
+    (userRole === UserRole.ADMIN || userRole === UserRole.TRAINER || userRole === UserRole.STUDENT);
+
   useEffect(() => {
-    if (currentUser) {
+    if (shouldLoadDirectory) {
       loadUsers();
     } else {
       setUsers([]);
+      setStudents([]);
+      setTrainers([]);
       setIsLoading(false);
     }
-  }, [currentUser]);
+  }, [shouldLoadDirectory, userId, userRole, sessionEpoch]);
 
 
   const getUsersByRole = (role: UserRole) => users.filter(u => u.role === role);

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { authService } from '@/services/auth';
 import { apiClient } from '@/services/client';
 import { BaseUser, OnboardingChecklist, StudentRegister, Trainer, UserRole, Guardian, GuardianInviteState, ProfileUpdate } from '@/types';
@@ -36,6 +36,8 @@ interface AuthContextType {
   clearError: () => void;
   syncSessionUser: () => Promise<BaseUser | null>;
   clearSession: () => void;
+  /** Increments on login/logout so data providers refetch and clear stale caches. */
+  sessionEpoch: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,19 +51,28 @@ const REGISTRATION_DRAFT_KEYS = [
   'userPhoneNumber',
 ];
 
+const EMPTY_ONBOARDING_CHECKLIST: OnboardingChecklist = {
+  accountCreated: false,
+  bookingPayed: false,
+  subscriptionPayed: false,
+  orientationBooked: false,
+  roadmapReceived: false,
+  learningStarted: false,
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const router = useRouter();
-  const [onboardingChecklist, setOnboardingChecklist] = useState<OnboardingChecklist>({
-    accountCreated: false,
-    bookingPayed: false,
-    subscriptionPayed: false,
-    orientationBooked: false,
-    roadmapReceived: false,
-    learningStarted: false,
-  });
+  const [onboardingChecklist, setOnboardingChecklist] = useState<OnboardingChecklist>(
+    EMPTY_ONBOARDING_CHECKLIST
+  );
+
+  const bumpSessionEpoch = useCallback(() => {
+    setSessionEpoch((epoch) => epoch + 1);
+  }, []);
 
   const authStatus: AuthStatus = useMemo(
     () => {
@@ -85,12 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearSession = useCallback(() => {
     setUser(null);
     setError(null);
+    setOnboardingChecklist(EMPTY_ONBOARDING_CHECKLIST);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('authFlow');
     localStorage.removeItem('resetToken');
-  }, []);
+    bumpSessionEpoch();
+  }, [bumpSessionEpoch]);
 
   const persistSession = useCallback((userData: BaseUser, token?: string) => {
     localStorage.setItem('user', JSON.stringify(userData));
@@ -98,7 +111,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token) {
       localStorage.setItem('auth_token', token);
     }
-    setUser(userData);
+    setUser((prev) => {
+      if (prev && JSON.stringify(prev) === JSON.stringify(userData)) {
+        return prev;
+      }
+      return userData;
+    });
   }, []);
 
   const clearRegistrationDraft = useCallback(() => {
@@ -203,28 +221,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bootstrap();
   }, [syncSessionUser]);
 
-  const fetchOnboardingChecklist = async () => {
-    if (user && user.role === UserRole.STUDENT && user.isVerified) {
-      try {
-        const currentStudent = await userService.getStudent();
-        if (currentStudent.success && currentStudent.data) {
-          persistSession(currentStudent.data);
-        }
-        const response = await authService.getOnboardingChecklist();
-        if (response.success && response.data) {
-          setOnboardingChecklist(response.data);
-        }
-      } catch {
-        // Silently fail - not critical
-      }
+  const userRef = useRef(user);
+  userRef.current = user;
+
+  const fetchOnboardingChecklist = useCallback(async () => {
+    const currentUser = userRef.current;
+    if (!currentUser || currentUser.role !== UserRole.STUDENT || !currentUser.isVerified) {
+      return;
     }
-  };
+
+    try {
+      const currentStudent = await userService.getStudent();
+      if (currentStudent.success && currentStudent.data) {
+        persistSession(currentStudent.data);
+      }
+      const response = await authService.getOnboardingChecklist();
+      if (response.success && response.data) {
+        setOnboardingChecklist((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(response.data)) {
+            return prev;
+          }
+          return response.data!;
+        });
+      }
+    } catch {
+      // Silently fail - not critical
+    }
+  }, [persistSession]);
 
   useEffect(() => {
-    if (user?._id && user.isVerified) {
+    if (user?._id && user.isVerified && user.role === UserRole.STUDENT) {
       fetchOnboardingChecklist();
     }
-  }, [user?._id, user?.isVerified]);
+  }, [user?._id, user?.isVerified, user?.role, fetchOnboardingChecklist]);
 
   const login = async (email: string, password: string): Promise<void> => {
     setIsLoading(true);
@@ -235,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data?.token && response.data.user) {
         const userData = response.data.user as BaseUser;
         persistSession(userData, response.data.token);
+        bumpSessionEpoch();
 
         if (!userData.isVerified) {
           await authService.sendOtp(email);
@@ -262,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (message.includes('pending approval') && response.data?.token && response.data.user) {
         persistSession(response.data.user as BaseUser, response.data.token);
+        bumpSessionEpoch();
         router.push('/auth/pending-approval');
         return;
       }
@@ -286,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerStudent(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        bumpSessionEpoch();
         clearRegistrationDraft();
         router.push('/auth/verify');
         return;
@@ -305,6 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerTrainer(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        bumpSessionEpoch();
         clearRegistrationDraft();
         router.push('/auth/verify');
         return;
@@ -352,6 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       persistSession(response.data.user, response.data.token);
+      bumpSessionEpoch();
       redirectAfterAuth(response.data.user);
       return true;
     } catch (err: unknown) {
@@ -429,6 +463,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearError,
       syncSessionUser,
       clearSession,
+      sessionEpoch,
     }}>
       {children}
     </AuthContext.Provider>

@@ -5,6 +5,8 @@ import { Mail, Calendar, Eye, CheckCircle, XCircle, AlertCircle, GraduationCap }
 import DataTable from '@/components/ui/DataTable';
 import { useUsers } from '@/contexts/UserContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { getAuthUserId } from '@/lib/auth/session';
+import { filterStudentsForTrainer } from '@/lib/users/trainerStudents';
 import { useRoadmaps } from '@/contexts/RoadmapContext';
 import { Student } from '@/types';
 import { RoadmapStepStatus } from '@/types/roadmap';
@@ -53,7 +55,7 @@ export default function StudentsTable({ searchQuery, selectedStatus }: StudentsT
   // Filter students assigned to current trainer
   const myStudents = useMemo(() => {
     if (!user) return [];
-    return students.filter(student => student.assignedTrainerId === user._id);
+    return filterStudentsForTrainer(students, getAuthUserId(user));
   }, [students, user]);
 
   // Filter students based on search and status

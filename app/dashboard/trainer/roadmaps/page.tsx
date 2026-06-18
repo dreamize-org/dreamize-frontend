@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from '@/hooks/useRouter';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { useAuth, useRoadmaps, useUsers } from '@/contexts';
+import { getAuthUserId } from '@/lib/auth/session';
+import { getRoadmapStudentId, getRoadmapTrainerId } from '@/lib/roadmap/access';
 import { roadmapService } from '@/services/roadmap';
 import { projectService } from '@/services/project';
 import { Roadmap, Milestone, RoadmapStepStatus, RoadmapStatus } from '@/types/roadmap';
@@ -33,15 +35,19 @@ export default function TrainerRoadmapsPage() {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [trainerFeedback, setTrainerFeedback] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [actionError, setActionError] = useState('');
   const [milestoneProjects, setMilestoneProjects] = useState<Project[]>([]);
+  const [loadingMilestoneProjects, setLoadingMilestoneProjects] = useState(false);
   const [viewingProjectDetail, setViewingProjectDetail] = useState<Project | null>(null);
 
   // Filter roadmaps for current trainer
-  const trainerRoadmaps = roadmaps.filter(r => r.trainer._id === user?._id);
+  const trainerRoadmaps = roadmaps.filter(
+    (roadmap) => getRoadmapTrainerId(roadmap) === getAuthUserId(user)
+  );
 
   // Apply filters
   const filteredRoadmaps = trainerRoadmaps.filter(roadmap => {
-    const student = students.find(s => s._id === roadmap.student._id);
+    const student = students.find((s) => s._id === getRoadmapStudentId(roadmap));
     const matchesSearch = 
       roadmap.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       student?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -90,6 +96,29 @@ export default function TrainerRoadmapsPage() {
     }
   };
 
+  const getMilestoneStatusLabel = (status: RoadmapStepStatus) => {
+    switch (status) {
+      case RoadmapStepStatus.COMPLETED:
+        return 'Completed';
+      case RoadmapStepStatus.ACTIVE:
+        return 'Active';
+      case RoadmapStepStatus.PENDING_APPROVAL:
+        return 'Pending review';
+      case RoadmapStepStatus.LOCKED:
+        return 'Locked';
+      default:
+        return status;
+    }
+  };
+
+  const syncSelectedRoadmap = async (roadmapId: string) => {
+    const latest = await roadmapService.getRoadmaps();
+    const refreshed = latest?.find((roadmap) => roadmap.id === roadmapId);
+    if (refreshed) {
+      setSelectedRoadmap(refreshed);
+    }
+  };
+
   const calculateRoadmapProgress = (roadmap: Roadmap) => {
     if (!roadmap.milestones?.length) return 0;
     const completed = roadmap.milestones.filter(m => m.status === RoadmapStepStatus.COMPLETED).length;
@@ -97,8 +126,27 @@ export default function TrainerRoadmapsPage() {
   };
 
   const handleRoadmapClick = async (roadmap: Roadmap) => {
+    setActionError('');
     setSelectedRoadmap(roadmap);
     setViewMode('detail');
+    await syncSelectedRoadmap(roadmap.id);
+  };
+
+  const canManageMilestones = (roadmap: Roadmap) =>
+    roadmap.status === 'active' || roadmap.status === 'approved';
+
+  const handleEnableNextMilestone = async () => {
+    if (!selectedRoadmap) return;
+
+    const nextLocked = selectedRoadmap.milestones?.find(
+      (milestone) => milestone.status === RoadmapStepStatus.LOCKED
+    );
+    if (!nextLocked) {
+      setActionError('No locked milestones are available to enable.');
+      return;
+    }
+
+    await handleMilestoneLockToggle(nextLocked, false);
   };
 
   const handleBackToList = () => {
@@ -107,41 +155,58 @@ export default function TrainerRoadmapsPage() {
     setSelectedMilestone(null);
   };
 
+  const loadMilestoneProjects = async (milestone: Milestone) => {
+    if (!milestone.submittedProjectIds?.length) {
+      setMilestoneProjects([]);
+      return [];
+    }
+
+    setLoadingMilestoneProjects(true);
+    try {
+      const projects: Project[] = [];
+      for (const projectId of milestone.submittedProjectIds) {
+        const response = await projectService.getProjectData(projectId);
+        if (response.data) {
+          projects.push(response.data);
+        }
+      }
+      setMilestoneProjects(projects);
+      return projects;
+    } catch {
+      setMilestoneProjects([]);
+      return [];
+    } finally {
+      setLoadingMilestoneProjects(false);
+    }
+  };
+
   const handleViewMilestoneDetails = async (milestone: Milestone) => {
     setSelectedMilestone(milestone);
     setTrainerFeedback(milestone.trainerFeedback || '');
-    
-    // Load projects for this milestone
-    if (milestone.submittedProjectIds?.length) {
-      try {
-        const projects: Project[] = [];
-        for (const projectId of milestone.submittedProjectIds) {
-          const response = await projectService.getProjectData(projectId);
-          if (response.data) projects.push(response.data);
-        }
-        setMilestoneProjects(projects);
-      } catch {
-        setMilestoneProjects([]);
-      }
-    } else {
-      setMilestoneProjects([]);
-    }
-    
+    setActionError('');
+    setViewingProjectDetail(null);
+    await loadMilestoneProjects(milestone);
     setShowApprovalModal(true);
   };
 
   const handleApproveMilestone = async () => {
     if (!selectedRoadmap || !selectedMilestone) return;
-    
+    if (selectedMilestone.status !== RoadmapStepStatus.PENDING_APPROVAL) {
+      setActionError('Only milestones awaiting review can be approved.');
+      return;
+    }
+
     setIsProcessing(true);
+    setActionError('');
     try {
       await roadmapService.approveMilestone(selectedRoadmap.id, selectedMilestone.order, trainerFeedback);
       await refreshRoadmaps();
+      await syncSelectedRoadmap(selectedRoadmap.id);
       setShowApprovalModal(false);
       setSelectedMilestone(null);
       setMilestoneProjects([]);
     } catch (error) {
-      console.error('Failed to approve milestone:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to approve milestone.');
     } finally {
       setIsProcessing(false);
     }
@@ -149,44 +214,130 @@ export default function TrainerRoadmapsPage() {
 
   const handleRejectMilestone = async () => {
     if (!selectedRoadmap || !selectedMilestone || !trainerFeedback.trim()) return;
-    
+    if (selectedMilestone.status !== RoadmapStepStatus.PENDING_APPROVAL) {
+      setActionError('Only milestones awaiting review can be rejected.');
+      return;
+    }
+
     setIsProcessing(true);
+    setActionError('');
     try {
       await roadmapService.rejectMilestone(selectedRoadmap.id, selectedMilestone.order, trainerFeedback);
       await refreshRoadmaps();
+      await syncSelectedRoadmap(selectedRoadmap.id);
       setShowApprovalModal(false);
       setSelectedMilestone(null);
       setMilestoneProjects([]);
     } catch (error) {
-      console.error('Failed to reject milestone:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to reject milestone.');
     } finally {
       setIsProcessing(false);
     }
   };
 
   const allProjectsApproved = () => {
-    if (!milestoneProjects.length) return true;
-    return milestoneProjects.every(p => p.status === ProjectStatus.APPROVED);
+    const submittedCount = selectedMilestone?.submittedProjectIds?.length ?? 0;
+    if (submittedCount === 0) {
+      return false;
+    }
+    if (loadingMilestoneProjects || milestoneProjects.length === 0) {
+      return false;
+    }
+    return milestoneProjects.every((project) => project.status === ProjectStatus.APPROVED);
   };
 
-  const pendingProjectsCount = () => {
-    return milestoneProjects.filter(p => p.status === ProjectStatus.PENDING_APPROVAL).length;
-  };
+  const pendingProjectsCount = () =>
+    milestoneProjects.filter((project) => project.status === ProjectStatus.PENDING_APPROVAL).length;
 
-  const handleMilestoneStatusChange = async (milestone: Milestone, newStatus: RoadmapStepStatus) => {
-    if (!selectedRoadmap) return;
-    
+  const handleApproveProject = async (projectId: string, feedback?: string) => {
     setIsProcessing(true);
+    setActionError('');
     try {
-      await roadmapService.updateMilestoneStatus(selectedRoadmap.id, milestone.order, newStatus);
-      await refreshRoadmaps();
-      // Update local state to reflect the change
-      const updatedMilestones = selectedRoadmap.milestones.map(m =>
-        m.order === milestone.order ? { ...m, status: newStatus } : m
-      );
-      setSelectedRoadmap({ ...selectedRoadmap, milestones: updatedMilestones });
+      await projectService.approveProject(projectId, feedback ?? trainerFeedback);
+      if (selectedMilestone) {
+        await loadMilestoneProjects(selectedMilestone);
+      }
+      if (selectedRoadmap) {
+        await refreshRoadmaps();
+        await syncSelectedRoadmap(selectedRoadmap.id);
+        if (selectedMilestone) {
+          const latest = await roadmapService.getRoadmaps();
+          const refreshedRoadmap = latest?.find((roadmap) => roadmap.id === selectedRoadmap.id);
+          const refreshedMilestone = refreshedRoadmap?.milestones?.find(
+            (milestone) => milestone.order === selectedMilestone.order
+          );
+          if (refreshedMilestone?.status === RoadmapStepStatus.COMPLETED) {
+            setShowApprovalModal(false);
+            setSelectedMilestone(null);
+            setMilestoneProjects([]);
+          } else if (refreshedMilestone) {
+            setSelectedMilestone(refreshedMilestone);
+          }
+        }
+      }
+      const updated = await projectService.getProjectData(projectId);
+      if (updated.data && viewingProjectDetail?.id === projectId) {
+        setViewingProjectDetail(updated.data);
+      }
     } catch (error) {
-      console.error('Failed to update milestone status:', error);
+      setActionError(error instanceof Error ? error.message : 'Failed to approve project.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRejectProject = async (projectId: string, feedback?: string) => {
+    const resolvedFeedback = (feedback ?? trainerFeedback).trim();
+    if (!resolvedFeedback) {
+      setActionError('Feedback is required when rejecting a project.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setActionError('');
+    const milestoneOrder = selectedMilestone?.order;
+    try {
+      await projectService.rejectProject(projectId, resolvedFeedback);
+      if (selectedMilestone) {
+        await loadMilestoneProjects(selectedMilestone);
+      }
+      if (selectedRoadmap && milestoneOrder != null) {
+        await refreshRoadmaps();
+        await syncSelectedRoadmap(selectedRoadmap.id);
+        const latest = await roadmapService.getRoadmaps();
+        const refreshedRoadmap = latest?.find((roadmap) => roadmap.id === selectedRoadmap.id);
+        if (refreshedRoadmap) {
+          setSelectedRoadmap(refreshedRoadmap);
+          const refreshedMilestone = refreshedRoadmap.milestones?.find(
+            (milestone) => milestone.order === milestoneOrder
+          );
+          if (refreshedMilestone) {
+            setSelectedMilestone(refreshedMilestone);
+          }
+        }
+      }
+      const updated = await projectService.getProjectData(projectId);
+      if (updated.data && viewingProjectDetail?.id === projectId) {
+        setViewingProjectDetail(updated.data);
+      }
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to reject project.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleMilestoneLockToggle = async (milestone: Milestone, locked: boolean) => {
+    if (!selectedRoadmap) return;
+
+    setIsProcessing(true);
+    setActionError('');
+    try {
+      await roadmapService.setMilestoneLockState(selectedRoadmap.id, milestone.order, locked);
+      await refreshRoadmaps();
+      await syncSelectedRoadmap(selectedRoadmap.id);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Failed to update milestone availability.');
     } finally {
       setIsProcessing(false);
     }
@@ -283,7 +434,7 @@ export default function TrainerRoadmapsPage() {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredRoadmaps.map((roadmap) => {
-                      const student = students.find(s => s._id === roadmap.student._id);
+                      const student = students.find((s) => s._id === getRoadmapStudentId(roadmap));
                       const progress = calculateRoadmapProgress(roadmap);
                       
                       return (
@@ -377,7 +528,7 @@ export default function TrainerRoadmapsPage() {
                           </div>
                           <h1 className="text-3xl md:text-4xl font-playfair font-semibold mb-2">{selectedRoadmap.title}</h1>
                           {(() => {
-                            const student = students.find(s => s._id === selectedRoadmap.student._id);
+                            const student = students.find((s) => s._id === getRoadmapStudentId(selectedRoadmap));
                             return (
                               <div className="flex items-center gap-2 text-white/90">
                                 <User className="w-5 h-5" />
@@ -411,13 +562,43 @@ export default function TrainerRoadmapsPage() {
                     <Target className="w-5 h-5 text-primary" />
                     Learning Milestones
                   </h2>
+                  {actionError && (
+                    <div className="mb-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {actionError}
+                    </div>
+                  )}
+                  {selectedRoadmap.status === 'pending-approval' && (
+                    <div className="mb-4 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                      This roadmap is waiting for admin approval. Milestones stay locked until an admin approves and launches it.
+                    </div>
+                  )}
+                  {canManageMilestones(selectedRoadmap) && (
+                    <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-slate-700">
+                        Enable milestones for your student to start submitting work. Only one milestone should be active at a time.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleEnableNextMilestone}
+                        disabled={
+                          isProcessing ||
+                          !selectedRoadmap.milestones?.some(
+                            (milestone) => milestone.status === RoadmapStepStatus.LOCKED
+                          )
+                        }
+                        className="px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 disabled:opacity-50 whitespace-nowrap"
+                      >
+                        Enable Next Milestone
+                      </button>
+                    </div>
+                  )}
                   <div className="space-y-0">
                     {selectedRoadmap.milestones?.map((milestone, index) => {
                       const isLast = index === (selectedRoadmap.milestones?.length || 0) - 1;
                       const isActive = milestone.status === RoadmapStepStatus.ACTIVE;
                       const isCompleted = milestone.status === RoadmapStepStatus.COMPLETED;
                       const isPending = milestone.status === RoadmapStepStatus.PENDING_APPROVAL;
-                      const pendingProjects = milestone.submittedProjectIds?.length || 0;
+                      const submittedProjectsCount = milestone.submittedProjectIds?.length || 0;
                       
                       return (
                         <div key={index} className="relative flex gap-4">
@@ -465,11 +646,11 @@ export default function TrainerRoadmapsPage() {
                                   <div className="flex items-center gap-3 mb-1">
                                     <h3 className="font-playfair font-semibold text-slate-900 text-lg">{milestone.title}</h3>
                                     <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getMilestoneStatusColor(milestone.status)}`}>
-                                      {milestone.status.replace('-', ' ').charAt(0).toUpperCase() + milestone.status.slice(1).replace('-', ' ')}
+                                      {getMilestoneStatusLabel(milestone.status)}
                                     </span>
-                                    {pendingProjects > 0 && (
+                                    {isPending && submittedProjectsCount > 0 && (
                                       <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-bold uppercase tracking-wider">
-                                        {pendingProjects} project{pendingProjects > 1 ? 's' : ''} to review
+                                        {submittedProjectsCount} submission{submittedProjectsCount > 1 ? 's' : ''}
                                       </span>
                                     )}
                                   </div>
@@ -488,20 +669,28 @@ export default function TrainerRoadmapsPage() {
                                 </div>
                                 
                                 {/* Status Dropdown */}
-                                <div className="flex items-center gap-2">
-                                  <select
-                                    value={milestone.status}
-                                    onChange={(e) => handleMilestoneStatusChange(milestone, e.target.value as RoadmapStepStatus)}
-                                    disabled={isProcessing}
-                                    className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                  >
-                                    <option value={RoadmapStepStatus.LOCKED}>Locked</option>
-                                    <option value={RoadmapStepStatus.ACTIVE}>Active</option>
-                                    <option value={RoadmapStepStatus.PENDING_APPROVAL}>Pending Approval</option>
-                                    <option value={RoadmapStepStatus.COMPLETED}>Completed</option>
-                                  </select>
-                                  
-                                  {/* View Details Button */}
+                                <div className="flex items-center gap-2 flex-wrap justify-end">
+                                  {canManageMilestones(selectedRoadmap) && milestone.status === RoadmapStepStatus.ACTIVE && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMilestoneLockToggle(milestone, true)}
+                                      disabled={isProcessing}
+                                      className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white hover:bg-slate-50 disabled:opacity-50"
+                                    >
+                                      Lock
+                                    </button>
+                                  )}
+                                  {canManageMilestones(selectedRoadmap) && milestone.status === RoadmapStepStatus.LOCKED && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMilestoneLockToggle(milestone, false)}
+                                      disabled={isProcessing}
+                                      className="px-3 py-2 border border-primary/20 rounded-xl text-sm bg-primary text-slate-900 font-semibold hover:bg-primary/90 disabled:opacity-50"
+                                    >
+                                      Enable Milestone
+                                    </button>
+                                  )}
+
                                   <button
                                     onClick={() => handleViewMilestoneDetails(milestone)}
                                     className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-xl hover:bg-slate-800 transition-colors shadow-sm"
@@ -568,7 +757,7 @@ export default function TrainerRoadmapsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getMilestoneStatusColor(selectedMilestone.status)}`}>
-                        {selectedMilestone.status.replace('-', ' ').charAt(0).toUpperCase() + selectedMilestone.status.slice(1).replace('-', ' ')}
+                        {getMilestoneStatusLabel(selectedMilestone.status)}
                       </span>
                     </div>
                     <h2 className="text-2xl font-bold text-gray-900">{selectedMilestone.title}</h2>
@@ -657,45 +846,13 @@ export default function TrainerRoadmapsPage() {
                                 </div>
                               </div>
                               <div className="flex flex-col gap-2">
-                                {/* View Details Button */}
                                 <button
                                   onClick={() => setViewingProjectDetail(project)}
                                   className="px-3 py-1.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium flex items-center gap-1.5"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
-                                  View Details
+                                  Review Project
                                 </button>
-                                {/* Quick Approve/Reject */}
-                                {project.status === ProjectStatus.PENDING_APPROVAL && (
-                                  <div className="flex gap-1">
-                                    <button
-                                      onClick={async () => {
-                                        await projectService.approveProject(project.id);
-                                        const updated = await projectService.getProjectData(project.id);
-                                        if (updated.data) {
-                                          setMilestoneProjects(prev => prev.map(p => p.id === project.id ? updated.data! : p));
-                                        }
-                                      }}
-                                      className="flex-1 p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                                      title="Approve"
-                                    >
-                                      <ThumbsUp className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={async () => {
-                                        await projectService.rejectProject(project.id);
-                                        const updated = await projectService.getProjectData(project.id);
-                                        if (updated.data) {
-                                          setMilestoneProjects(prev => prev.map(p => p.id === project.id ? updated.data! : p));
-                                        }
-                                      }}
-                                      className="flex-1 p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                                      title="Reject"
-                                    >
-                                      <ThumbsDown className="w-3.5 h-3.5" />
-                                    </button>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </div>
@@ -707,8 +864,14 @@ export default function TrainerRoadmapsPage() {
                         <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-lg flex items-start gap-2">
                           <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
                           <p className="text-sm text-orange-700">
-                            <span className="font-medium">Action Required:</span> {pendingProjectsCount()} project(s) need approval before you can approve this milestone.
+                            <span className="font-medium">Step 1:</span> Review and approve each submitted project below.{' '}
+                            <span className="font-medium">Step 2:</span> The milestone completes automatically once all projects are approved (a certificate is issued to the student).
                           </p>
+                        </div>
+                      )}
+                      {loadingMilestoneProjects && (
+                        <div className="mt-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600">
+                          Loading submitted projects...
                         </div>
                       )}
                     </div>
@@ -739,7 +902,14 @@ export default function TrainerRoadmapsPage() {
                     />
                   </div>
 
+                  {actionError && (
+                    <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {actionError}
+                    </div>
+                  )}
+
                   {/* Action Buttons */}
+                  {selectedMilestone.status === RoadmapStepStatus.PENDING_APPROVAL ? (
                   <div className="flex gap-3 pt-4 border-t border-gray-200">
                     <button
                       onClick={() => setShowApprovalModal(false)}
@@ -757,12 +927,23 @@ export default function TrainerRoadmapsPage() {
                     <button
                       onClick={handleApproveMilestone}
                       disabled={isProcessing || !allProjectsApproved()}
+                      title={!allProjectsApproved() ? 'Approve all submitted projects first' : undefined}
                       className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       <CheckSquare className="w-4 h-4" />
                       {isProcessing ? 'Processing...' : 'Approve Milestone'}
                     </button>
                   </div>
+                  ) : (
+                    <div className="pt-4 border-t border-gray-200">
+                      <button
+                        onClick={() => setShowApprovalModal(false)}
+                        className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             ) : (
@@ -977,29 +1158,15 @@ export default function TrainerRoadmapsPage() {
                   {viewingProjectDetail.status === ProjectStatus.PENDING_APPROVAL && (
                     <div className="flex gap-3 pt-4 border-t border-gray-200">
                       <button
-                        onClick={async () => {
-                          await projectService.rejectProject(viewingProjectDetail.id, trainerFeedback);
-                          const updated = await projectService.getProjectData(viewingProjectDetail.id);
-                          if (updated.data) {
-                            setMilestoneProjects(prev => prev.map(p => p.id === viewingProjectDetail.id ? updated.data! : p));
-                            setViewingProjectDetail(updated.data);
-                          }
-                        }}
-                        disabled={isProcessing}
+                        onClick={() => handleRejectProject(viewingProjectDetail.id)}
+                        disabled={isProcessing || !trainerFeedback.trim()}
                         className="flex-1 px-4 py-3 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                       >
                         <ThumbsDown className="w-4 h-4" />
                         Reject Project
                       </button>
                       <button
-                        onClick={async () => {
-                          await projectService.approveProject(viewingProjectDetail.id, trainerFeedback);
-                          const updated = await projectService.getProjectData(viewingProjectDetail.id);
-                          if (updated.data) {
-                            setMilestoneProjects(prev => prev.map(p => p.id === viewingProjectDetail.id ? updated.data! : p));
-                            setViewingProjectDetail(updated.data);
-                          }
-                        }}
+                        onClick={() => handleApproveProject(viewingProjectDetail.id)}
                         disabled={isProcessing}
                         className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 font-medium flex items-center justify-center gap-2"
                       >

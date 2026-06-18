@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { CheckCircle, Lock, CreditCard, Calendar, BookOpen, ArrowRight, Zap, Star, Trophy, Target } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigationWithLoading } from '@/lib/utils/navigation';
+import { useRequireRole } from '@/hooks/useRequireRole';
 import { OnboardingChecklist, UserRole } from '@/types';
 import { BookingStatus } from '@/types/booking';
 import BookingCalendar from '@/components/booking/BookingCalendar';
@@ -11,27 +12,14 @@ import Sidebar from '@/components/dashboard/Sidebar';
 import { useBooking } from '@/contexts/BookingContext';
 
 export default function StudentDashboard() {
-  const { user, isAuthenticated, isLoading: authLoading, onboardingChecklist } = useAuth();
+  const { user, authLoading, isAuthorized } = useRequireRole('student');
+  const { onboardingChecklist } = useAuth();
   const { navigate } = useNavigationWithLoading();
   const { refreshBookings, studentBookings } = useBooking();
 
-  // Modal states
   const [showBookingCalendar, setShowBookingCalendar] = useState(false);
 
-  // Redirect if not authenticated or not a student
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate('/auth/login');
-      return;
-    }
-
-    if (!authLoading && user && user.role !== 'student') {
-      navigate('/dashboard/trainer');
-    }
-  }, [authLoading, isAuthenticated, user, navigate]);
-
-  // Show loading while checking auth
-  if (authLoading) {
+  if (authLoading || !isAuthorized) {
     return (
       <div className="flex min-h-screen lg:h-screen bg-white">
         <Sidebar activeItem="Home" userType={UserRole.STUDENT} />
