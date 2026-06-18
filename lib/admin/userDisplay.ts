@@ -21,7 +21,7 @@ export function formatUserRole(role: UserRole): string {
     case UserRole.SALES_MANAGER:
       return 'Sales Manager';
     default:
-      return role.replace(/_/g, ' ');
+      return String(role).replace(/_/g, ' ');
   }
 }
 
