@@ -428,8 +428,11 @@ export default function GuardianDashboard() {
                         <p className="text-slate-400 italic">No approved projects yet.</p>
                       ) : (
                         <div className="space-y-4">
-                          {studentProjects.map((project) => (
-                            <div key={project._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                          {studentProjects.map((project, index) => (
+                            <div
+                              key={getRecordKey(project, `project-${index}`)}
+                              className="p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                            >
                               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">
                                 {project.category}
                               </p>
