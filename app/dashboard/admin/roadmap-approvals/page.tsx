@@ -150,8 +150,8 @@ export default function RoadmapApprovalsPage() {
   };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Roadmap Approvals" userType={UserRole.ADMIN} />
+    <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+      <Sidebar activeItem="roadmaps" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -163,7 +163,7 @@ export default function RoadmapApprovalsPage() {
                 <span className="text-slate-300">•</span>
                 <span className="text-[12px] font-medium text-slate-400 italic">Pedagogical Review</span>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Roadmap Approval Queue</h1>
+              <h1 className="text-2xl font-playfair font-bold text-slate-900">Roadmap Approval Queue</h1>
             </div>
 
             <div className="flex items-center gap-3">
@@ -177,24 +177,34 @@ export default function RoadmapApprovalsPage() {
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
           <div className="max-w-7xl mx-auto">
-            <div className="flex flex-wrap gap-2 mb-8">
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl overflow-x-auto mb-8 w-fit max-w-full">
               {[
                 { id: 'pending' as const, label: 'Pending Review', count: pendingRoadmaps.length },
                 { id: 'approved' as const, label: 'Approved (Needs Launch)', count: approvedRoadmaps.length },
                 { id: 'active' as const, label: 'Active Roadmaps', count: activeRoadmaps.length },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
-                    activeTab === tab.id
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {tab.label} ({tab.count})
-                </button>
-              ))}
+              ].map((tab) => {
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {tab.label}
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-md ${
+                        isActive ? 'bg-primary/10 text-primary' : 'bg-slate-200'
+                      }`}
+                    >
+                      {tab.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             
             {/* Section Header with Badge */}

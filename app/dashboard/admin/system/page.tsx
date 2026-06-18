@@ -49,8 +49,8 @@ export default function AdminSystemPage() {
   const { metrics, alerts, services, isLoading, error, refreshSystemData } = useSystem();
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="System Health" userType={UserRole.ADMIN} />
+    <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+      <Sidebar activeItem="system" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
@@ -62,7 +62,7 @@ export default function AdminSystemPage() {
                 <span className="text-slate-300">•</span>
                 <span className="text-[12px] font-medium text-slate-400 italic">Global Node Status</span>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">System Health Dashboard</h1>
+              <h1 className="text-2xl font-playfair font-bold text-slate-900">System Health Dashboard</h1>
             </div>
 
             <div className="flex items-center gap-3">

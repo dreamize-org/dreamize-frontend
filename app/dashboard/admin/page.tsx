@@ -33,8 +33,8 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-        <Sidebar activeItem="Dashboard" userType={UserRole.ADMIN} />
+      <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
+        <Sidebar activeItem="home" userType={UserRole.ADMIN} />
         <div className="flex-1 flex flex-col">
           <div className="h-20 bg-white border-b border-slate-100 animate-pulse"></div>
           <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-8">
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex min-h-screen lg:h-screen bg-[#FDF9F2]">
-      <Sidebar activeItem="Dashboard" userType={UserRole.ADMIN} />
+      <Sidebar activeItem="home" userType={UserRole.ADMIN} />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 sticky top-0 z-10">

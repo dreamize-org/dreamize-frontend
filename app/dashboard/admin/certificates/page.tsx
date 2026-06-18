@@ -1,11 +1,20 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import Sidebar from '@/components/dashboard/Sidebar';
-import { UserRole } from '@/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  AdminEmptyState,
+  AdminFooter,
+  AdminHeader,
+  AdminLoadingState,
+  AdminMain,
+  AdminPanel,
+  AdminSectionBadge,
+  AdminShell,
+  AdminStatCard,
+} from '@/components/admin/AdminLayout';
 import { adminService } from '@/services/admin';
 import { certificateService, type CertificateRecord } from '@/services/certificates';
-import { Award, Download, Loader2, Search } from 'lucide-react';
+import { Award, Download, Search, ScrollText, Users, Calendar } from 'lucide-react';
 
 export default function AdminCertificatesPage() {
   const [certificates, setCertificates] = useState<CertificateRecord[]>([]);
@@ -36,112 +45,166 @@ export default function AdminCertificatesPage() {
     loadCertificates();
   }, [loadCertificates]);
 
+  const stats = useMemo(() => {
+    const now = new Date();
+    const thisMonth = certificates.filter((cert) => {
+      const date = new Date(cert.completionDate);
+      return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+    }).length;
+    const uniqueStudents = new Set(certificates.map((cert) => cert.student)).size;
+    const roadmapCompletions = certificates.filter(
+      (cert) => cert.milestoneId === 'roadmap-completion'
+    ).length;
+
+    return { total: certificates.length, thisMonth, uniqueStudents, roadmapCompletions };
+  }, [certificates]);
+
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
     loadCertificates(searchQuery.trim() || undefined);
   };
 
   return (
-    <div className="flex min-h-screen lg:h-screen bg-[#F8FAFC]">
-      <Sidebar activeItem="Certificates" userType={UserRole.ADMIN} />
+    <AdminShell activeItem="certificates">
+      <AdminHeader
+        badge="Credentials"
+        subtitle="Issued Certificates"
+        title="Certificate Registry"
+        actions={
+          <form onSubmit={handleSearch} className="relative w-full md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search student, milestone, or cert no."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 border-none"
+            />
+          </form>
+        }
+      />
 
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <header className="bg-white border-b border-slate-100 px-8 py-5">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Award className="w-6 h-6 text-primary" />
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">Certificates</h1>
-                <p className="text-slate-500 mt-1">Search and download certificates issued across the platform.</p>
-              </div>
-            </div>
+      <AdminMain>
+        <AdminSectionBadge label="Credential Vault" />
 
-            <form onSubmit={handleSearch} className="relative max-w-md w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search student, milestone, or certificate no."
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 border-none"
-              />
-            </form>
+        {!loading && !error && certificates.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <AdminStatCard
+              label="Total Issued"
+              value={stats.total}
+              icon={ScrollText}
+              iconClassName="text-amber-500"
+              iconBgClassName="bg-amber-50"
+            />
+            <AdminStatCard
+              label="This Month"
+              value={stats.thisMonth}
+              icon={Calendar}
+              iconClassName="text-primary"
+              iconBgClassName="bg-primary/10"
+            />
+            <AdminStatCard
+              label="Unique Students"
+              value={stats.uniqueStudents}
+              icon={Users}
+              iconClassName="text-blue-500"
+              iconBgClassName="bg-blue-50"
+            />
+            <AdminStatCard
+              label="Roadmap Completions"
+              value={stats.roadmapCompletions}
+              icon={Award}
+              iconClassName="text-green-500"
+              iconBgClassName="bg-green-50"
+            />
           </div>
-        </header>
+        )}
 
-        <main className="flex-1 overflow-y-auto p-8">
-          <div className="max-w-7xl mx-auto">
-            {loading ? (
-              <div className="flex items-center justify-center py-24">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              </div>
-            ) : error ? (
-              <div className="bg-white rounded-[32px] border border-slate-100 p-12 text-center text-slate-500">
-                {error}
-              </div>
-            ) : certificates.length === 0 ? (
-              <div className="bg-white rounded-[32px] border border-slate-100 p-12 text-center text-slate-500">
-                No certificates found.
-              </div>
-            ) : (
-              <div className="bg-white rounded-[32px] border border-slate-100 overflow-hidden shadow-sm">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50/80">
-                    <tr>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Certificate
-                      </th>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Student
-                      </th>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Milestone
-                      </th>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Trainer
-                      </th>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Completed
-                      </th>
-                      <th className="px-6 py-4 text-[11px] font-bold uppercase tracking-widest text-slate-400">
-                        Actions
-                      </th>
+        <AdminPanel
+          title="Issued Certificates"
+          description="Search and download credentials earned by students"
+        >
+          {loading ? (
+            <AdminLoadingState label="Loading certificate registry..." />
+          ) : error ? (
+            <div className="p-12 text-center text-slate-500">{error}</div>
+          ) : certificates.length === 0 ? (
+            <AdminEmptyState
+              icon={Award}
+              title="No certificates yet"
+              description="Certificates appear here automatically when trainers approve milestones or students complete roadmaps."
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50">
+                    {['Certificate', 'Student', 'Milestone', 'Trainer', 'Completed', 'Actions'].map(
+                      (heading) => (
+                        <th
+                          key={heading}
+                          className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-[11px] font-bold uppercase tracking-widest text-slate-400"
+                        >
+                          {heading}
+                        </th>
+                      )
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {certificates.map((certificate) => (
+                    <tr key={certificate._id} className="group hover:bg-slate-50/50 transition-all duration-300">
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center group-hover:bg-amber-100 transition-colors">
+                            <Award className="w-4 h-4 text-amber-600" />
+                          </div>
+                          <span className="font-mono text-sm font-bold text-slate-900">
+                            {certificate.certificateNumber}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                        <p className="text-sm font-semibold text-slate-900">{certificate.studentName}</p>
+                      </td>
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                        <span className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600">
+                          {certificate.milestoneName}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-sm text-slate-600">
+                        {certificate.trainerName}
+                      </td>
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 text-sm text-slate-600">
+                        {new Date(certificate.completionDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </td>
+                      <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
+                        <button
+                          onClick={() =>
+                            certificateService.downloadCertificate(
+                              certificate._id,
+                              certificate.certificateNumber
+                            )
+                          }
+                          className="inline-flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          PDF
+                        </button>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {certificates.map((certificate) => (
-                      <tr key={certificate._id} className="hover:bg-slate-50/50">
-                        <td className="px-6 py-4 font-mono text-sm text-slate-700">
-                          {certificate.certificateNumber}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-slate-900">{certificate.studentName}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{certificate.milestoneName}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{certificate.trainerName}</td>
-                        <td className="px-6 py-4 text-sm text-slate-600">
-                          {new Date(certificate.completionDate).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={() =>
-                              certificateService.downloadCertificate(
-                                certificate._id,
-                                certificate.certificateNumber
-                              )
-                            }
-                            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary hover:underline"
-                          >
-                            <Download className="w-4 h-4" />
-                            PDF
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
-    </div>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AdminPanel>
+
+        <AdminFooter label="© Dreamize Africa 2025 • Credential Protocol" />
+      </AdminMain>
+    </AdminShell>
   );
 }
