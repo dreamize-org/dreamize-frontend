@@ -19,7 +19,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, sessionEpoch } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [trainers, setTrainers] = useState<Trainer[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -74,7 +74,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       setTrainers([]);
       setIsLoading(false);
     }
-  }, [shouldLoadDirectory, userId, userRole]);
+  }, [shouldLoadDirectory, userId, userRole, sessionEpoch]);
 
 
   const getUsersByRole = (role: UserRole) => users.filter(u => u.role === role);

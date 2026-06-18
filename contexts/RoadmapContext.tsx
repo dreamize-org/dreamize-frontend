@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { CreateRoadmapData, Roadmap } from "@/types/roadmap";
 import { roadmapService } from "@/services/roadmap";
+import { useAuth } from "./AuthContext";
 
 interface RoadmapContextType {
     roadmaps: Roadmap[];
@@ -20,11 +21,12 @@ interface RoadmapContextType {
 const RoadmapContext = createContext<RoadmapContextType | null>(null);
 
 export const RoadmapProvider = ({ children }: { children: React.ReactNode }) => {
+    const { user, sessionEpoch, isSessionReady } = useAuth();
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
 
-    const fetchRoadmaps = async () => {
+    const fetchRoadmaps = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
@@ -36,7 +38,7 @@ export const RoadmapProvider = ({ children }: { children: React.ReactNode }) => 
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
     const createRoadmap = async (data: CreateRoadmapData): Promise<Roadmap> => {
         try {
@@ -59,8 +61,15 @@ export const RoadmapProvider = ({ children }: { children: React.ReactNode }) => 
     const getRoadmapByIdFromContext = (id: string) => roadmaps.find(r => r.id === id);
 
     useEffect(() => {
+        if (!user?._id || !isSessionReady) {
+            setRoadmaps([]);
+            setError(null);
+            setLoading(false);
+            return;
+        }
+
         fetchRoadmaps();
-    }, []);
+    }, [user?._id, user?.role, sessionEpoch, isSessionReady, fetchRoadmaps]);
 
     return (
         <RoadmapContext.Provider value={{

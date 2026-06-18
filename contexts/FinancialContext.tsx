@@ -22,7 +22,7 @@ interface FinancialContextType {
 const FinancialContext = createContext<FinancialContextType | undefined>(undefined);
 
 export function FinancialProvider({ children }: { children: React.ReactNode }) {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, sessionEpoch } = useAuth();
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -119,7 +119,7 @@ export function FinancialProvider({ children }: { children: React.ReactNode }) {
       setUserWallet(null);
       setIsLoading(false);
     }
-  }, [userId, userRole]);
+  }, [userId, userRole, sessionEpoch]);
 
   const getWalletByOwnerIdFromContext = (ownerId: string) => wallets.find((wallet) => wallet.ownerId === ownerId);
 

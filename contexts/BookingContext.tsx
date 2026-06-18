@@ -26,7 +26,7 @@ export const BookingProvider = ({ children }: { children: React.ReactNode }) => 
     const [trainerPendingBookings, setTrainerPendingBookings] = useState<Booking[]>([]);
     const [trainerAllBookings, setTrainerAllBookings] = useState<Booking[]>([]);
     const [studentBookings, setStudentBookings] = useState<Booking[]>([]);
-    const { user, isLoading: authLoading } = useAuth();
+    const { user, isLoading: authLoading, sessionEpoch } = useAuth();
 
     const fetchStudentBookings = useCallback(async () => {
         try {
@@ -79,7 +79,7 @@ export const BookingProvider = ({ children }: { children: React.ReactNode }) => 
         setStudentBookings([]);
         setTrainerPendingBookings([]);
         setTrainerAllBookings([]);
-    }, [authLoading, user?.role, user?._id, fetchStudentBookings, fetchTrainerBookings]);
+    }, [authLoading, user?.role, user?._id, sessionEpoch, fetchStudentBookings, fetchTrainerBookings]);
 
     const approveBooking = async (bookingId: string, approvalData: TrainerApprovalRequest) => {
         try {

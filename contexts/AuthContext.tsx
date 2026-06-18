@@ -36,6 +36,8 @@ interface AuthContextType {
   clearError: () => void;
   syncSessionUser: () => Promise<BaseUser | null>;
   clearSession: () => void;
+  /** Increments on login/logout so data providers refetch and clear stale caches. */
+  sessionEpoch: number;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -49,19 +51,28 @@ const REGISTRATION_DRAFT_KEYS = [
   'userPhoneNumber',
 ];
 
+const EMPTY_ONBOARDING_CHECKLIST: OnboardingChecklist = {
+  accountCreated: false,
+  bookingPayed: false,
+  subscriptionPayed: false,
+  orientationBooked: false,
+  roadmapReceived: false,
+  learningStarted: false,
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<BaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sessionEpoch, setSessionEpoch] = useState(0);
   const router = useRouter();
-  const [onboardingChecklist, setOnboardingChecklist] = useState<OnboardingChecklist>({
-    accountCreated: false,
-    bookingPayed: false,
-    subscriptionPayed: false,
-    orientationBooked: false,
-    roadmapReceived: false,
-    learningStarted: false,
-  });
+  const [onboardingChecklist, setOnboardingChecklist] = useState<OnboardingChecklist>(
+    EMPTY_ONBOARDING_CHECKLIST
+  );
+
+  const bumpSessionEpoch = useCallback(() => {
+    setSessionEpoch((epoch) => epoch + 1);
+  }, []);
 
   const authStatus: AuthStatus = useMemo(
     () => {
@@ -85,12 +96,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearSession = useCallback(() => {
     setUser(null);
     setError(null);
+    setOnboardingChecklist(EMPTY_ONBOARDING_CHECKLIST);
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     localStorage.removeItem('userEmail');
     localStorage.removeItem('authFlow');
     localStorage.removeItem('resetToken');
-  }, []);
+    bumpSessionEpoch();
+  }, [bumpSessionEpoch]);
 
   const persistSession = useCallback((userData: BaseUser, token?: string) => {
     localStorage.setItem('user', JSON.stringify(userData));
@@ -251,6 +264,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (response.success && response.data?.token && response.data.user) {
         const userData = response.data.user as BaseUser;
         persistSession(userData, response.data.token);
+        bumpSessionEpoch();
 
         if (!userData.isVerified) {
           await authService.sendOtp(email);
@@ -278,6 +292,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (message.includes('pending approval') && response.data?.token && response.data.user) {
         persistSession(response.data.user as BaseUser, response.data.token);
+        bumpSessionEpoch();
         router.push('/auth/pending-approval');
         return;
       }
@@ -302,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerStudent(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        bumpSessionEpoch();
         clearRegistrationDraft();
         router.push('/auth/verify');
         return;
@@ -321,6 +337,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authService.registerTrainer(data);
       if (response.success && response.data) {
         persistSession(response.data.user, response.data.token);
+        bumpSessionEpoch();
         clearRegistrationDraft();
         router.push('/auth/verify');
         return;
@@ -368,6 +385,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       persistSession(response.data.user, response.data.token);
+      bumpSessionEpoch();
       redirectAfterAuth(response.data.user);
       return true;
     } catch (err: unknown) {
@@ -445,6 +463,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearError,
       syncSessionUser,
       clearSession,
+      sessionEpoch,
     }}>
       {children}
     </AuthContext.Provider>

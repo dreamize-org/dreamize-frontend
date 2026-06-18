@@ -54,7 +54,7 @@ interface AdminContextType {
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
 export function AdminProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, sessionEpoch } = useAuth();
   const adminHook = useAdmin();
   
   // State
@@ -166,14 +166,27 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    if (!isAdmin || !adminUserId) return;
+    if (!isAdmin || !adminUserId) {
+      setUsers([]);
+      setTrainers([]);
+      setPendingTrainers([]);
+      setPayments([]);
+      setAnalytics(null);
+      setTickets([]);
+      setUsersLoading(false);
+      setTrainersLoading(false);
+      setPaymentsLoading(false);
+      setAnalyticsLoading(false);
+      setTicketsLoading(false);
+      return;
+    }
     refreshUsers();
     refreshTrainers();
     refreshPayments();
     refreshAnalytics();
     refreshTickets();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminUserId, isAdmin]);
+  }, [adminUserId, isAdmin, sessionEpoch]);
 
   return (
     <AdminContext.Provider value={{
