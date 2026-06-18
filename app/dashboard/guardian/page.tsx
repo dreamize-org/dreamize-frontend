@@ -32,12 +32,17 @@ interface StudentWithDetails extends Student {
 }
 
 interface GuardianProject {
-  _id: string;
+  id?: string;
+  _id?: string;
   title: string;
   description: string;
   category: string;
   trainerFeedback?: string;
   approvedAt?: string;
+}
+
+function getRecordKey(item: { id?: string; _id?: string }, fallback: string): string {
+  return item.id ?? item._id ?? fallback;
 }
 
 export default function GuardianDashboard() {
@@ -333,8 +338,8 @@ export default function GuardianDashboard() {
 
                        {selectedStudent.roadmap ? (
                          <div className="space-y-6 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-px before:bg-slate-100">
-                            {selectedStudent.roadmap.milestones.map((milestone, idx) => (
-                              <div key={idx} className="flex gap-6 relative z-10">
+                            {selectedStudent.roadmap.milestones.map((milestone) => (
+                              <div key={milestone.order} className="flex gap-6 relative z-10">
                                  <div className="mt-1">
                                     {getMilestoneStatusIcon(milestone.status)}
                                  </div>
@@ -382,8 +387,11 @@ export default function GuardianDashboard() {
                         <p className="text-slate-400 italic">No certificates earned yet.</p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {studentCertificates.map((certificate) => (
-                            <div key={certificate._id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
+                          {studentCertificates.map((certificate, index) => (
+                            <div
+                              key={getRecordKey(certificate, `certificate-${index}`)}
+                              className="p-5 bg-slate-50 rounded-2xl border border-slate-100"
+                            >
                               <p className="text-[10px] font-bold uppercase tracking-widest text-primary mb-1">
                                 {certificate.certificateNumber}
                               </p>
@@ -394,7 +402,7 @@ export default function GuardianDashboard() {
                               <button
                                 onClick={() =>
                                   certificateService.downloadCertificate(
-                                    certificate._id,
+                                    getRecordKey(certificate, certificate.certificateNumber),
                                     certificate.certificateNumber
                                   )
                                 }
